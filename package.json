@@ -1,0 +1,22 @@
+{
+  "name": "blade-of-ages",
+  "version": "1.0.0",
+  "description": "2D historical sword fighting game",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "generate:art": "node --env-file=.env scripts/generate-art.js",
+    "generate:arenas": "node --env-file=.env scripts/generate-arenas.js"
+  },
+  "author": "Joe Jansen <josephjansen@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "phaser": "^3.90.0",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "vite": "^8.0.3"
+  }
+}
