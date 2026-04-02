@@ -30,35 +30,37 @@ export class InstructionsScene extends Phaser.Scene {
     const p2X = GAME_WIDTH / 2 + 200;
     const panelY = 280;
 
-    this.createControlPanel(p1X, panelY, 'PLAYER 1', '#1565c0', {
+    this.createControlPanel(p1X, panelY - 15, 'PLAYER 1', '#1565c0', {
       Move: 'A / D',
       Jump: 'W',
-      Block: 'S',
+      Crouch: 'S',
       Light: 'F',
       Heavy: 'G',
-      Special: 'H'
+      Block: 'H',
+      Special: 'R'
     });
 
-    this.createControlPanel(p2X, panelY, 'PLAYER 2', '#c62828', {
-      Move: 'Left/Right Arrows',
-      Jump: 'Up Arrow',
-      Block: 'Down Arrow',
-      Light: 'K',
-      Heavy: 'L',
-      Special: 'Enter / ;'
+    this.createControlPanel(p2X, panelY - 15, 'PLAYER 2', '#c62828', {
+      Move: 'Left/Right',
+      Jump: 'Up',
+      Crouch: 'Down',
+      Light: ';',
+      Heavy: "'",
+      Block: '/',
+      Special: '.'
     });
 
     // Combo / Combat Mechanics section at bottom
-    const infoBg = this.add.rectangle(GAME_WIDTH / 2, 490, 640, 100, 0x000000, 0.8)
+    const infoBg = this.add.rectangle(GAME_WIDTH / 2, 510, 720, 115, 0x000000, 0.8)
       .setStrokeStyle(2, 0x888888);
     
-    this.add.text(GAME_WIDTH / 2, 465, 'COMBAT TIPS', {
-      fontSize: '20px', fontFamily: 'Impact, sans-serif', color: '#ffcc00'
+    this.add.text(GAME_WIDTH / 2, 475, 'COMBAT TIPS', {
+      fontSize: '22px', fontFamily: 'Impact, sans-serif', color: '#ffcc00'
     }).setOrigin(0.5);
 
     const tipsText = "• Light attacks are fast but deal less damage.\n• Heavy attacks are slow but break guards and deal huge damage.\n• Build your Special Meter by landing hits to unleash your ultimate attack!\n• You can perform combat moves while jumping in the air for aerial dominance.";
-    this.add.text(GAME_WIDTH / 2, 510, tipsText, {
-      fontSize: '14px', fontFamily: 'Georgia, serif', color: '#dddddd', align: 'center', lineSpacing: 5
+    this.add.text(GAME_WIDTH / 2, 525, tipsText, {
+      fontSize: '15px', fontFamily: 'Georgia, serif', color: '#dddddd', align: 'center', lineSpacing: 5
     }).setOrigin(0.5);
 
     // Back hint
@@ -77,7 +79,7 @@ export class InstructionsScene extends Phaser.Scene {
 
   createControlPanel(x, y, title, color, controls) {
     const w = 340;
-    const h = 260;
+    const h = 295;
     
     this.add.rectangle(x, y, w, h, 0x111111, 0.9)
       .setStrokeStyle(3, parseInt(color.replace('#',''), 16));
@@ -88,7 +90,7 @@ export class InstructionsScene extends Phaser.Scene {
       fontSize: '24px', fontFamily: 'Impact, sans-serif', color: '#ffffff', stroke: '#000000', strokeThickness: 4
     }).setOrigin(0.5);
 
-    let startY = y - 60;
+    let startY = y - 75;
     for (const [action, key] of Object.entries(controls)) {
       this.add.text(x - 130, startY, action + ':', {
         fontSize: '16px', fontFamily: 'Georgia, serif', color: '#aaaaaa'
