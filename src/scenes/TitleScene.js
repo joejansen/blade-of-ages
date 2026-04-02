@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SoundManager } from '../audio/SoundManager.js';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/constants.js';
 
 export class TitleScene extends Phaser.Scene {
@@ -106,6 +107,7 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     btn.on('pointerover', () => {
+      SoundManager.playUIHover(this);
       btn.setFillStyle(0xff0000);
       btnText.setScale(1.1);
       btnBorder.setScale(1.05);
@@ -116,6 +118,7 @@ export class TitleScene extends Phaser.Scene {
       btnBorder.setScale(1);
     });
     btn.on('pointerdown', () => {
+      SoundManager.playUIClick(this);
       this.scene.start('ModeSelect');
     });
 
@@ -134,6 +137,7 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     instBtn.on('pointerover', () => {
+      SoundManager.playUIHover(this);
       instBtn.setFillStyle(0x333333);
       instText.setScale(1.1);
       instBorder.setScale(1.05);
@@ -144,6 +148,7 @@ export class TitleScene extends Phaser.Scene {
       instBorder.setScale(1);
     });
     instBtn.on('pointerdown', () => {
+      SoundManager.playUIClick(this);
       this.scene.start('Instructions');
     });
 

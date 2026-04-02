@@ -14,6 +14,7 @@ import {
 } from '../config/constants.js';
 import { BoneSystem } from './BoneSystem.js';
 import { getSkeletonConfig } from '../config/skeletons.js';
+import { SoundManager } from '../audio/SoundManager.js';
 
 // State durations in ms
 const STATE_DURATIONS = {
@@ -234,6 +235,12 @@ export class Fighter {
     this.hasHitThisAttack = false;
     this.animFrame = 0;
     this.animTimer = 0;
+
+    // SFX
+    if (newState === 'lightAttack') SoundManager.playCombat(this.scene, 'light_attack');
+    else if (newState === 'heavyAttack') SoundManager.playCombat(this.scene, 'heavy_attack');
+    else if (newState === 'special') SoundManager.playCombat(this.scene, 'special');
+    else if (newState === 'jumping') SoundManager.playCombat(this.scene, 'jump');
 
     // Stop horizontal velocity during attacks and hit stun only if on ground
     if (newState === 'lightAttack' || newState === 'heavyAttack' ||

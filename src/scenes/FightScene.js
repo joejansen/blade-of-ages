@@ -4,6 +4,7 @@ import { CombatManager } from '../combat/CombatManager.js';
 import { InputManager } from '../combat/InputManager.js';
 import { AIController } from '../ai/AIController.js';
 import { HUD } from '../ui/HUD.js';
+import { SoundManager } from '../audio/SoundManager.js';
 import { drawArena } from '../art/arenas.js';
 import { getWarriorById } from '../config/warriors.js';
 import {
@@ -194,6 +195,7 @@ export class FightScene extends Phaser.Scene {
         ? getWarriorById(this.matchData.warrior1Id)
         : getWarriorById(this.matchData.warrior2Id);
       this.showRoundAnnouncement(`${winnerConfig.name}`, 'WINS!');
+      SoundManager.playCombat(this, 'victory');
     } else {
       this.roundState = 'roundEnd';
       this.roundTimer = ROUND_END_DELAY;

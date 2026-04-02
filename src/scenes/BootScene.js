@@ -61,6 +61,17 @@ export class BootScene extends Phaser.Scene {
     for (const arena of ARENAS) {
       this.load.image(`arena_${arena}`, `assets/arenas/${arena}.jpg`);
     }
+
+    // Load Audio
+    this.load.audio('light_attack', 'assets/sounds/light_attack.mp3');
+    this.load.audio('heavy_attack', 'assets/sounds/heavy_attack.wav');
+    this.load.audio('jump', 'assets/sounds/jump.mp3');
+    this.load.audio('hit', 'assets/sounds/hit.wav');
+    this.load.audio('block', 'assets/sounds/block.wav');
+    this.load.audio('special', 'assets/sounds/special.mp3');
+    this.load.audio('ui_click', 'assets/sounds/ui_click.mp3');
+    this.load.audio('ui_hover', 'assets/sounds/ui_hover.mp3');
+    this.load.audio('victory', 'assets/sounds/victory.wav');
   }
 
   create() {

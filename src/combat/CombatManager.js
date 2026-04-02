@@ -3,6 +3,7 @@ import {
   HITSTOP_DURATION_LIGHT,
   HITSTOP_DURATION_HEAVY,
 } from '../config/constants.js';
+import { SoundManager } from '../audio/SoundManager.js';
 
 export class CombatManager {
   constructor(scene) {
@@ -58,8 +59,10 @@ export class CombatManager {
     const hitY = attackBox.y + attackBox.height / 2;
 
     if (result.wasBlocked) {
+      SoundManager.playCombat(this.scene, 'block');
       this.spawnBlockSparks(hitX, hitY);
     } else {
+      SoundManager.playCombat(this.scene, 'hit');
       this.spawnHitSparks(hitX, hitY, isHeavy || isSpecial);
     }
 

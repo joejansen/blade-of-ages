@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SoundManager } from '../audio/SoundManager.js';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/constants.js';
 import { WARRIORS } from '../config/warriors.js';
 

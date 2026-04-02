@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SoundManager } from '../audio/SoundManager.js';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/constants.js';
 import { WARRIORS } from '../config/warriors.js';
 
@@ -177,6 +178,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       card.setFillStyle(0x111111, 0.85);
     });
     card.on('pointerdown', () => {
+      SoundManager.playUIClick(this);
       this.selectWarrior(warrior, index);
     });
 

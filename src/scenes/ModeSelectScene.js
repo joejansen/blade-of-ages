@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SoundManager } from '../audio/SoundManager.js';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/constants.js';
 
 export class ModeSelectScene extends Phaser.Scene {
@@ -153,6 +154,7 @@ export class ModeSelectScene extends Phaser.Scene {
       titleText.setScale(1);
     });
     card.on('pointerdown', () => {
+      SoundManager.playUIClick(this);
       this.scene.start('CharacterSelect', { mode });
     });
   }

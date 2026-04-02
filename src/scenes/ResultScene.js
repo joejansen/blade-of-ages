@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SoundManager } from '../audio/SoundManager.js';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/constants.js';
 
 export class ResultScene extends Phaser.Scene {
@@ -152,9 +153,15 @@ export class ResultScene extends Phaser.Scene {
       color: '#aaaaaa',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-    menuText.on('pointerover', () => menuText.setColor('#ffffff'));
+    menuText.on('pointerover', () => {
+      SoundManager.playUIHover(this);
+      menuText.setColor('#ffffff');
+    });
     menuText.on('pointerout', () => menuText.setColor('#aaaaaa'));
-    menuText.on('pointerdown', () => this.scene.start('Title'));
+    menuText.on('pointerdown', () => {
+      SoundManager.playUIClick(this);
+      this.scene.start('Title');
+    });
 
     // Keyboard shortcuts
     this.input.keyboard.on('keydown-R', () => {
@@ -193,6 +200,7 @@ export class ResultScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     btn.on('pointerover', () => {
+      SoundManager.playUIHover(this);
       btn.setFillStyle(0x333333);
       text.setScale(1.05);
     });
@@ -200,6 +208,9 @@ export class ResultScene extends Phaser.Scene {
       btn.setFillStyle(0x111111);
       text.setScale(1);
     });
-    btn.on('pointerdown', onClick);
+    btn.on('pointerdown', () => {
+      SoundManager.playUIClick(this);
+      onClick();
+    });
   }
 }
