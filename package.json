@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "generate:art": "node --env-file=.env scripts/generate-art.js",
-    "generate:arenas": "node --env-file=.env scripts/generate-arenas.js"
+    "generate:arenas": "node --env-file=.env scripts/generate-arenas.js",
+    "compress": "node scripts/compress-assets.js"
   },
   "author": "Joe Jansen <josephjansen@gmail.com>",
   "license": "ISC",

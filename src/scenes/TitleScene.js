@@ -92,7 +92,7 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Start button
-    const btnY = 480;
+    const btnY = 430;
     const btn = this.add.rectangle(GAME_WIDTH / 2, btnY, 260, 60, 0x8b0000)
       .setInteractive({ useHandCursor: true });
     const btnBorder = this.add.rectangle(GAME_WIDTH / 2, btnY, 260, 60)
@@ -119,6 +119,34 @@ export class TitleScene extends Phaser.Scene {
       this.scene.start('ModeSelect');
     });
 
+    // Instructions button
+    const instY = 510;
+    const instBtn = this.add.rectangle(GAME_WIDTH / 2, instY, 260, 60, 0x111111)
+      .setInteractive({ useHandCursor: true });
+    const instBorder = this.add.rectangle(GAME_WIDTH / 2, instY, 260, 60)
+      .setStrokeStyle(4, COLORS.gold);
+    const instText = this.add.text(GAME_WIDTH / 2, instY, 'HOW TO PLAY', {
+      fontSize: '22px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+
+    instBtn.on('pointerover', () => {
+      instBtn.setFillStyle(0x333333);
+      instText.setScale(1.1);
+      instBorder.setScale(1.05);
+    });
+    instBtn.on('pointerout', () => {
+      instBtn.setFillStyle(0x111111);
+      instText.setScale(1);
+      instBorder.setScale(1);
+    });
+    instBtn.on('pointerdown', () => {
+      this.scene.start('Instructions');
+    });
+
     // Also start on any key press
     this.input.keyboard.once('keydown', () => {
       this.scene.start('ModeSelect');
@@ -134,7 +162,7 @@ export class TitleScene extends Phaser.Scene {
     });
 
     // "Press any key" hint
-    const hint = this.add.text(GAME_WIDTH / 2, 580, 'Press any key or click to start', {
+    const hint = this.add.text(GAME_WIDTH / 2, 590, 'Press any key or click to start', {
       fontSize: '14px',
       fontFamily: 'Georgia, serif',
       color: '#8d6e63',

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from './config/constants.js';
 import { BootScene } from './scenes/BootScene.js';
 import { TitleScene } from './scenes/TitleScene.js';
+import { InstructionsScene } from './scenes/InstructionsScene.js';
 import { ModeSelectScene } from './scenes/ModeSelectScene.js';
 import { CharacterSelectScene } from './scenes/CharacterSelectScene.js';
 import { ArenaSelectScene } from './scenes/ArenaSelectScene.js';
@@ -28,6 +29,7 @@ const config = {
   scene: [
     BootScene,
     TitleScene,
+    InstructionsScene,
     ModeSelectScene,
     CharacterSelectScene,
     ArenaSelectScene,
