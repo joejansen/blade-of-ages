@@ -7,29 +7,28 @@ export class ModeSelectScene extends Phaser.Scene {
   }
 
   create() {
-    // Parchment background
-    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, COLORS.parchment);
+    // Dynamic Dark Background
+    const bgArena = 'arena_longship'; // Just a cool background
+    const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, bgArena);
+    bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+    bg.setTint(0x444444);
+
+    // Header Background
+    this.add.rectangle(GAME_WIDTH / 2, 85, GAME_WIDTH, 80, 0x000000, 0.6);
 
     // Border
     const border = this.add.graphics();
-    border.lineStyle(4, COLORS.inkBrown, 1);
+    border.lineStyle(4, 0x000000, 0.8);
     border.strokeRect(30, 30, GAME_WIDTH - 60, GAME_HEIGHT - 60);
 
     // Header
-    this.add.text(GAME_WIDTH / 2, 100, 'Choose Your Path', {
-      fontSize: '42px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#3e2723',
+    this.add.text(GAME_WIDTH / 2, 85, 'CHOOSE YOUR PATH', {
+      fontSize: '48px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 8,
     }).setOrigin(0.5);
-
-    // Divider
-    const div = this.add.graphics();
-    div.lineStyle(2, COLORS.inkBrown, 0.4);
-    div.beginPath();
-    div.moveTo(GAME_WIDTH / 2 - 120, 140);
-    div.lineTo(GAME_WIDTH / 2 + 120, 140);
-    div.stroke();
 
     // 1 Player button
     this.createModeButton(
@@ -49,10 +48,11 @@ export class ModeSelectScene extends Phaser.Scene {
 
     // VS emblem in center
     this.add.text(GAME_WIDTH / 2, 310, 'VS', {
-      fontSize: '28px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#8d6e63',
+      fontSize: '42px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffcc00',
+      stroke: '#000000',
+      strokeThickness: 4,
     }).setOrigin(0.5);
 
     // Sword icons flanking VS
@@ -70,10 +70,12 @@ export class ModeSelectScene extends Phaser.Scene {
     swords.stroke();
 
     // Back hint
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 60, 'ESC to return', {
-      fontSize: '14px',
-      fontFamily: 'Georgia, serif',
-      color: '#a1887f',
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 60, 'ESC TO RETURN', {
+      fontSize: '18px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
     }).setOrigin(0.5);
 
     this.input.keyboard.on('keydown-ESC', () => {
@@ -82,17 +84,17 @@ export class ModeSelectScene extends Phaser.Scene {
   }
 
   createModeButton(x, y, title, description, mode) {
-    const w = 260;
-    const h = 220;
+    const w = 280;
+    const h = 240;
 
     // Card background
-    const card = this.add.rectangle(x, y, w, h, 0xffffff, 0.5)
-      .setStrokeStyle(2, COLORS.inkBrown)
+    const card = this.add.rectangle(x, y, w, h, 0x111111, 0.85)
+      .setStrokeStyle(4, 0x000000)
       .setInteractive({ useHandCursor: true });
 
     // Player icon
     const icon = this.add.graphics();
-    icon.fillStyle(COLORS.inkBrown, 0.7);
+    icon.fillStyle(COLORS.gold, 1);
     if (mode === '1p') {
       // Single figure
       icon.fillCircle(x, y - 60, 15);
@@ -122,28 +124,32 @@ export class ModeSelectScene extends Phaser.Scene {
     }
 
     // Title
-    const titleText = this.add.text(x, y + 10, title, {
-      fontSize: '22px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#3e2723',
+    const titleText = this.add.text(x, y + 20, title.toUpperCase(), {
+      fontSize: '26px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 4,
     }).setOrigin(0.5);
 
     // Description
-    this.add.text(x, y + 55, description, {
-      fontSize: '13px',
+    this.add.text(x, y + 70, description, {
+      fontSize: '14px',
       fontFamily: 'Georgia, serif',
-      color: '#795548',
+      fontStyle: 'italic',
+      color: '#cccccc',
       align: 'center',
     }).setOrigin(0.5);
 
     // Hover effects
     card.on('pointerover', () => {
-      card.setFillStyle(COLORS.gold, 0.2);
+      card.setFillStyle(0x333333, 0.95);
+      card.setStrokeStyle(4, COLORS.gold);
       titleText.setScale(1.05);
     });
     card.on('pointerout', () => {
-      card.setFillStyle(0xffffff, 0.5);
+      card.setFillStyle(0x111111, 0.85);
+      card.setStrokeStyle(4, 0x000000);
       titleText.setScale(1);
     });
     card.on('pointerdown', () => {

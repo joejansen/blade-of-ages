@@ -128,16 +128,16 @@ export class CharacterSelectScene extends Phaser.Scene {
     
     // Backdrop for head box
     portraitG.fillStyle(0x000000, 0.9);
-    portraitG.fillRoundedRect(x - 35, y - h / 2 + 10, 70, 70, 6);
+    portraitG.fillRoundedRect(x - 35, y - h / 2 + 5, 70, 70, 6);
     portraitG.lineStyle(3, primary, 1);
-    portraitG.strokeRoundedRect(x - 35, y - h / 2 + 10, 70, 70, 6);
+    portraitG.strokeRoundedRect(x - 35, y - h / 2 + 5, 70, 70, 6);
 
     // Custom AI Generated Head Portrait!
-    const headImage = this.add.image(x, y - h / 2 + 45, `warrior_${warrior.id}_head`);
+    const headImage = this.add.image(x, y - h / 2 + 40, `warrior_${warrior.id}_head`);
     headImage.setDisplaySize(60, 60);
 
     // Name
-    this.add.text(x, y + 18, warrior.name.toUpperCase(), {
+    this.add.text(x, y + 15, warrior.name.toUpperCase(), {
       fontSize: '15px',
       fontFamily: 'Impact, sans-serif',
       color: '#ffffff',
@@ -148,21 +148,21 @@ export class CharacterSelectScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Era
-    this.add.text(x, y + 38, warrior.era, {
+    this.add.text(x, y + 30, warrior.era, {
       fontSize: '11px',
       fontFamily: 'Georgia, serif',
       color: '#aaaaaa',
     }).setOrigin(0.5);
 
-    // Stat bars
-    const barY = y + 55;
+    // Stat bars - move up slightly
+    const barY = y + 42;
     const barW = w - 40;
     this.drawStatBar(x, barY, barW, 'SPD', warrior.speed, portraitG);
     this.drawStatBar(x, barY + 14, barW, 'PWR', warrior.power, portraitG);
     this.drawStatBar(x, barY + 28, barW, 'HP', warrior.health, portraitG);
 
-    // Weapon label
-    this.add.text(x, y + h / 2 - 12, warrior.weapon, {
+    // Weapon label - move down slightly
+    this.add.text(x, y + h / 2 - 8, warrior.weapon, {
       fontSize: '11px',
       fontFamily: 'Georgia, serif',
       fontStyle: 'italic',
