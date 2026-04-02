@@ -10,7 +10,7 @@ import { fileURLToPath } from "url";
 import sharp from "sharp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ASSETS_DIR = path.join(__dirname, "..", "assets", "arenas");
+const ASSETS_DIR = path.join(__dirname, "..", "public", "assets", "arenas");
 
 const API_KEY = process.env.GEMINI_API_KEY;
 if (!API_KEY) {
