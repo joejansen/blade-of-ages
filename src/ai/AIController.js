@@ -42,14 +42,14 @@ export class AIController {
 
     // Use special if meter is full and threshold met
     const hpRatio = self.hp / self.maxHp;
-    if (self.specialMeter >= 100 && distance < 120) {
+    if (self.specialMeter >= 100 && distance < 140) {
       if (hpRatio <= p.specialThreshold || roll < 0.3) {
         return 'special';
       }
     }
 
     // Counter-attack when opponent is attacking
-    if (opponentAttacking && distance < 100) {
+    if (opponentAttacking && distance < 140) {
       if (roll < p.counterTendency) {
         return roll < p.counterTendency * 0.5 ? 'heavyAttack' : 'lightAttack';
       }
@@ -59,7 +59,7 @@ export class AIController {
     }
 
     // Close range combat
-    if (distance < 90) {
+    if (distance < 125) {
       // Decide between attack and defense
       if (roll < p.aggression) {
         // Attack choice with variation
@@ -74,7 +74,7 @@ export class AIController {
     }
 
     // Mid range — approach or wait
-    if (distance < 200) {
+    if (distance < 240) {
       if (roll < p.aggression * 0.8) {
         return 'approach';
       }
