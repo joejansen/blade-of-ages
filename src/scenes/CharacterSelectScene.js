@@ -23,19 +23,25 @@ export class CharacterSelectScene extends Phaser.Scene {
     border.lineStyle(4, COLORS.inkBrown, 1);
     border.strokeRect(30, 30, GAME_WIDTH - 60, GAME_HEIGHT - 60);
 
+    // Header Background
+    this.add.rectangle(GAME_WIDTH / 2, 65, GAME_WIDTH, 80, 0x000000, 0.5);
+
     // Header
-    this.add.text(GAME_WIDTH / 2, 65, 'Choose Your Warrior', {
+    this.add.text(GAME_WIDTH / 2, 65, 'CHOOSE YOUR WARRIOR', {
       fontSize: '36px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#3e2723',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 6,
     }).setOrigin(0.5);
 
     // Player indicator
-    this.playerIndicator = this.add.text(GAME_WIDTH / 2, 100, '', {
-      fontSize: '16px',
-      fontFamily: 'Georgia, serif',
-      color: '#795548',
+    this.playerIndicator = this.add.text(GAME_WIDTH / 2, 120, '', {
+      fontSize: '18px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffcc00',
+      stroke: '#000000',
+      strokeThickness: 3,
     }).setOrigin(0.5);
     this.updatePlayerIndicator();
 
@@ -106,8 +112,8 @@ export class CharacterSelectScene extends Phaser.Scene {
 
   createWarriorCard(x, y, w, h, warrior, index) {
     // Card background
-    const card = this.add.rectangle(x, y, w, h, 0xffffff, 0.6)
-      .setStrokeStyle(2, COLORS.inkBrown)
+    const card = this.add.rectangle(x, y, w, h, 0x111111, 0.85)
+      .setStrokeStyle(3, 0x000000)
       .setInteractive({ useHandCursor: true });
 
     // Selection highlight (hidden by default)
@@ -119,38 +125,33 @@ export class CharacterSelectScene extends Phaser.Scene {
     // Mini warrior portrait (colored rectangle with icon)
     const portraitG = this.add.graphics();
     const primary = parseInt(warrior.colors.primary.replace('#', ''), 16);
-    const accent = parseInt(warrior.colors.accent.replace('#', ''), 16);
-    portraitG.fillStyle(primary, 1);
-    portraitG.fillRoundedRect(x - 25, y - h / 2 + 15, 50, 55, 4);
-    portraitG.lineStyle(2, 0x000000, 0.5);
-    portraitG.strokeRoundedRect(x - 25, y - h / 2 + 15, 50, 55, 4);
+    
+    // Backdrop for head box
+    portraitG.fillStyle(0x000000, 0.9);
+    portraitG.fillRoundedRect(x - 35, y - h / 2 + 10, 70, 70, 6);
+    portraitG.lineStyle(3, primary, 1);
+    portraitG.strokeRoundedRect(x - 35, y - h / 2 + 10, 70, 70, 6);
 
-    // Simple warrior silhouette
-    portraitG.fillStyle(0x000000, 0.6);
-    portraitG.fillCircle(x, y - h / 2 + 32, 10);
-    portraitG.fillRect(x - 6, y - h / 2 + 42, 12, 20);
-    // Weapon line
-    portraitG.lineStyle(2, accent, 1);
-    portraitG.beginPath();
-    portraitG.moveTo(x + 8, y - h / 2 + 44);
-    portraitG.lineTo(x + 20, y - h / 2 + 28);
-    portraitG.stroke();
+    // Custom AI Generated Head Portrait!
+    const headImage = this.add.image(x, y - h / 2 + 45, `warrior_${warrior.id}_head`);
+    headImage.setDisplaySize(60, 60);
 
     // Name
-    this.add.text(x, y + 15, warrior.name, {
-      fontSize: '13px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#3e2723',
+    this.add.text(x, y + 18, warrior.name.toUpperCase(), {
+      fontSize: '15px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
       align: 'center',
-      wordWrap: { width: w - 20 },
+      wordWrap: { width: w - 10 },
     }).setOrigin(0.5);
 
     // Era
     this.add.text(x, y + 38, warrior.era, {
-      fontSize: '10px',
+      fontSize: '11px',
       fontFamily: 'Georgia, serif',
-      color: '#795548',
+      color: '#aaaaaa',
     }).setOrigin(0.5);
 
     // Stat bars
@@ -162,18 +163,18 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     // Weapon label
     this.add.text(x, y + h / 2 - 12, warrior.weapon, {
-      fontSize: '10px',
+      fontSize: '11px',
       fontFamily: 'Georgia, serif',
       fontStyle: 'italic',
-      color: '#8d6e63',
+      color: '#cccccc',
     }).setOrigin(0.5);
 
     // Hover
     card.on('pointerover', () => {
-      card.setFillStyle(COLORS.gold, 0.15);
+      card.setFillStyle(0x333333, 0.95);
     });
     card.on('pointerout', () => {
-      card.setFillStyle(0xffffff, 0.6);
+      card.setFillStyle(0x111111, 0.85);
     });
     card.on('pointerdown', () => {
       this.selectWarrior(warrior, index);
@@ -191,14 +192,16 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     // Label
     this.add.text(x - maxW / 2, y, label, {
-      fontSize: '9px',
-      fontFamily: 'monospace',
-      color: '#8d6e63',
+      fontSize: '10px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
     });
 
     // Background
-    g.fillStyle(0xdddddd, 0.5);
+    g.fillStyle(0x000000, 0.8);
     g.fillRect(barX, y + 1, barW, 7);
+    g.lineStyle(1, 0x444444, 1);
+    g.strokeRect(barX, y + 1, barW, 7);
 
     // Fill
     const color = value >= 1.1 ? 0x4caf50 : value >= 0.95 ? 0xffc107 : 0xff9800;

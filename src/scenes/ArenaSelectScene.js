@@ -29,20 +29,26 @@ export class ArenaSelectScene extends Phaser.Scene {
   }
 
   create() {
-    // Parchment background
-    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, COLORS.parchment);
+    // Dynamic Dark UI Background
+    const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'arena_dojo');
+    bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+    bg.setTint(0x333333); // Very dark to make cards pop out
+
+    // Header Background
+    this.add.rectangle(GAME_WIDTH / 2, 65, GAME_WIDTH, 80, 0x000000, 0.5);
 
     // Border
     const border = this.add.graphics();
-    border.lineStyle(4, COLORS.inkBrown, 1);
+    border.lineStyle(4, 0x000000, 0.8);
     border.strokeRect(30, 30, GAME_WIDTH - 60, GAME_HEIGHT - 60);
 
     // Header
-    this.add.text(GAME_WIDTH / 2, 65, 'Choose Your Battlefield', {
+    this.add.text(GAME_WIDTH / 2, 65, 'CHOOSE YOUR BATTLEFIELD', {
       fontSize: '36px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#3e2723',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 6,
     }).setOrigin(0.5);
 
     // Arena grid — 2 rows of 5
@@ -64,15 +70,16 @@ export class ArenaSelectScene extends Phaser.Scene {
 
     // Random arena button
     const randY = GAME_HEIGHT - 80;
-    const randBtn = this.add.rectangle(GAME_WIDTH / 2, randY, 220, 45, COLORS.inkBrown)
+    const randBtn = this.add.rectangle(GAME_WIDTH / 2, randY, 260, 50, 0x111111)
       .setInteractive({ useHandCursor: true });
-    this.add.rectangle(GAME_WIDTH / 2, randY, 220, 45)
-      .setStrokeStyle(2, COLORS.gold);
+    this.add.rectangle(GAME_WIDTH / 2, randY, 260, 50)
+      .setStrokeStyle(3, COLORS.gold);
     const randText = this.add.text(GAME_WIDTH / 2, randY, 'RANDOM ARENA', {
-      fontSize: '18px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
+      fontSize: '22px',
+      fontFamily: 'Impact, sans-serif',
       color: '#ffd700',
+      stroke: '#000000',
+      strokeThickness: 3,
     }).setOrigin(0.5);
 
     randBtn.on('pointerover', () => {
@@ -101,56 +108,69 @@ export class ArenaSelectScene extends Phaser.Scene {
   }
 
   createArenaCard(x, y, w, h, arena) {
-    // Color preview thumbnail
-    const g = this.add.graphics();
-    g.fillStyle(arena.color, 0.3);
-    g.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
-    g.lineStyle(2, COLORS.inkBrown, 0.5);
-    g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+    // Draw thick border behind image
+    const cardBg = this.add.graphics();
+    cardBg.fillStyle(0x000000, 1);
+    cardBg.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+    cardBg.lineStyle(3, 0x444444, 1);
+    cardBg.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 6);
 
-    // Color swatch strip at top
-    g.fillStyle(arena.color, 0.7);
-    g.fillRect(x - w / 2, y - h / 2, w, 25);
+    // Arena Graphic Thumbnail
+    const thumb = this.add.image(x, y, `arena_${arena.id}`);
+    thumb.setDisplaySize(w - 4, h - 4); // Slightly smaller to fit in border
+    thumb.setTint(0x888888); // Dim until hovered
+    
+    // Mask to keep rounded corners
+    const shape = this.make.graphics();
+    shape.fillStyle(0xffffff);
+    shape.fillRoundedRect(x - w / 2 + 2, y - h / 2 + 2, w - 4, h - 4, 6);
+    thumb.setMask(shape.createGeometryMask());
+
+    // Gradient fade at bottom for text readability
+    const fade = this.add.graphics();
+    fade.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0, 0, 0.9, 0.9);
+    fade.fillRect(x - w / 2 + 2, y + 20, w - 4, h / 2 - 22);
 
     // Interactive overlay
     const card = this.add.rectangle(x, y, w, h, 0xffffff, 0.01)
       .setInteractive({ useHandCursor: true });
 
     // Arena name
-    this.add.text(x, y + 5, arena.name, {
-      fontSize: '14px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#3e2723',
+    this.add.text(x, y + 27, arena.name.toUpperCase(), {
+      fontSize: '16px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
       align: 'center',
-      wordWrap: { width: w - 15 },
+      wordWrap: { width: w - 10 },
     }).setOrigin(0.5);
 
     // Warrior association
-    this.add.text(x, y + 30, arena.warrior, {
-      fontSize: '10px',
+    this.add.text(x, y + 45, arena.warrior, {
+      fontSize: '11px',
       fontFamily: 'Georgia, serif',
       fontStyle: 'italic',
-      color: '#795548',
+      color: '#ffcc00',
+      stroke: '#000000',
+      strokeThickness: 2,
     }).setOrigin(0.5);
 
     card.on('pointerover', () => {
-      g.clear();
-      g.fillStyle(COLORS.gold, 0.2);
-      g.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
-      g.fillStyle(arena.color, 0.8);
-      g.fillRect(x - w / 2, y - h / 2, w, 25);
-      g.lineStyle(2, COLORS.gold, 1);
-      g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+      thumb.clearTint();
+      cardBg.clear();
+      cardBg.fillStyle(0x000000, 1);
+      cardBg.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+      cardBg.lineStyle(4, COLORS.gold, 1);
+      cardBg.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 6);
     });
     card.on('pointerout', () => {
-      g.clear();
-      g.fillStyle(arena.color, 0.3);
-      g.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
-      g.fillStyle(arena.color, 0.7);
-      g.fillRect(x - w / 2, y - h / 2, w, 25);
-      g.lineStyle(2, COLORS.inkBrown, 0.5);
-      g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+      thumb.setTint(0x888888);
+      cardBg.clear();
+      cardBg.fillStyle(0x000000, 1);
+      cardBg.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+      cardBg.lineStyle(3, 0x444444, 1);
+      cardBg.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 6);
     });
     card.on('pointerdown', () => {
       this.startFight(arena.id);

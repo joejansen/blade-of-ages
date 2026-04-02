@@ -7,41 +7,61 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create() {
-    // Parchment background
-    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, COLORS.parchment);
+    // Dynamic Arena Background
+    const bgArena = 'arena_castle'; // Or randomize it
+    const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, bgArena);
+    bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+    bg.setTint(0x555555); // Darken for text contrast
 
-    // Decorative border
+    // Heavy Decorative border
     const border = this.add.graphics();
-    border.lineStyle(4, COLORS.inkBrown, 1);
+    border.lineStyle(4, 0x000000, 0.8);
     border.strokeRect(30, 30, GAME_WIDTH - 60, GAME_HEIGHT - 60);
-    border.lineStyle(2, COLORS.gold, 0.5);
+    border.lineStyle(2, COLORS.gold, 0.8);
     border.strokeRect(36, 36, GAME_WIDTH - 72, GAME_HEIGHT - 72);
 
     // Corner ornaments
     const corners = [[40, 40], [GAME_WIDTH - 40, 40], [40, GAME_HEIGHT - 40], [GAME_WIDTH - 40, GAME_HEIGHT - 40]];
     for (const [cx, cy] of corners) {
-      border.fillStyle(COLORS.gold, 0.8);
+      border.fillStyle(COLORS.gold, 1);
       border.fillCircle(cx, cy, 8);
-      border.lineStyle(1, COLORS.inkBrown, 1);
+      border.lineStyle(2, 0x000000, 1);
       border.strokeCircle(cx, cy, 8);
     }
 
+    // Title Drop Shadow
+    this.add.text(GAME_WIDTH / 2 + 5, 185, 'BLADE', {
+      fontSize: '108px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#000000',
+      alpha: 0.8
+    }).setOrigin(0.5);
+
     // Title — "BLADE"
     this.add.text(GAME_WIDTH / 2, 180, 'BLADE', {
-      fontSize: '96px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#3e2723',
-      stroke: '#ffd700',
-      strokeThickness: 3,
+      fontSize: '108px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 8,
     }).setOrigin(0.5);
 
     // Subtitle — "of Ages"
+    this.add.text(GAME_WIDTH / 2 + 3, 273, 'of Ages', {
+      fontSize: '52px',
+      fontFamily: 'Georgia, serif',
+      fontStyle: 'italic',
+      color: '#000000',
+      alpha: 0.8
+    }).setOrigin(0.5);
+
     this.add.text(GAME_WIDTH / 2, 270, 'of Ages', {
       fontSize: '52px',
       fontFamily: 'Georgia, serif',
       fontStyle: 'italic',
-      color: '#5d4037',
+      color: '#ffd700',
+      stroke: '#000000',
+      strokeThickness: 4,
     }).setOrigin(0.5);
 
     // Decorative sword divider
@@ -60,34 +80,40 @@ export class TitleScene extends Phaser.Scene {
     divider.fillRect(GAME_WIDTH / 2 - 2, 308, 4, 24);
     divider.fillRect(GAME_WIDTH / 2 - 10, 318, 20, 4);
 
+    // Tagline backdrop
+    this.add.rectangle(GAME_WIDTH / 2, 370, 400, 30, 0x000000, 0.6);
+
     // Tagline
     this.add.text(GAME_WIDTH / 2, 370, 'Warriors across time. One battlefield.', {
       fontSize: '18px',
       fontFamily: 'Georgia, serif',
       fontStyle: 'italic',
-      color: '#795548',
+      color: '#ffffff',
     }).setOrigin(0.5);
 
     // Start button
     const btnY = 480;
-    const btn = this.add.rectangle(GAME_WIDTH / 2, btnY, 260, 60, COLORS.inkBrown)
+    const btn = this.add.rectangle(GAME_WIDTH / 2, btnY, 260, 60, 0x8b0000)
       .setInteractive({ useHandCursor: true });
     const btnBorder = this.add.rectangle(GAME_WIDTH / 2, btnY, 260, 60)
-      .setStrokeStyle(2, COLORS.gold);
+      .setStrokeStyle(4, COLORS.gold);
     const btnText = this.add.text(GAME_WIDTH / 2, btnY, 'ENTER BATTLE', {
-      fontSize: '24px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#ffd700',
+      fontSize: '26px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 4,
     }).setOrigin(0.5);
 
     btn.on('pointerover', () => {
-      btn.setFillStyle(0x5d4037);
-      btnText.setScale(1.05);
+      btn.setFillStyle(0xff0000);
+      btnText.setScale(1.1);
+      btnBorder.setScale(1.05);
     });
     btn.on('pointerout', () => {
-      btn.setFillStyle(COLORS.inkBrown);
+      btn.setFillStyle(0x8b0000);
       btnText.setScale(1);
+      btnBorder.setScale(1);
     });
     btn.on('pointerdown', () => {
       this.scene.start('ModeSelect');

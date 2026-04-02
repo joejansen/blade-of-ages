@@ -19,20 +19,20 @@ export class HUD {
     this.graphics.setDepth(50);
 
     // Warrior names
-    this.name1 = scene.add.text(PADDING, TOP_Y - 18, warrior1Config.name, {
-      fontSize: '16px',
-      fontFamily: 'Georgia, serif',
-      color: '#ffd700',
-      stroke: '#000',
-      strokeThickness: 2,
+    this.name1 = scene.add.text(PADDING, TOP_Y - 22, warrior1Config.name.toUpperCase(), {
+      fontSize: '20px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 5,
     }).setDepth(51);
 
-    this.name2 = scene.add.text(GAME_WIDTH - PADDING, TOP_Y - 18, warrior2Config.name, {
-      fontSize: '16px',
-      fontFamily: 'Georgia, serif',
-      color: '#ffd700',
-      stroke: '#000',
-      strokeThickness: 2,
+    this.name2 = scene.add.text(GAME_WIDTH - PADDING, TOP_Y - 22, warrior2Config.name.toUpperCase(), {
+      fontSize: '20px',
+      fontFamily: 'Impact, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 5,
     }).setOrigin(1, 0).setDepth(51);
 
     // Round indicators container
@@ -63,8 +63,12 @@ export class HUD {
     const ratio = Math.max(0, hp / maxHp);
 
     // Background
-    g.fillStyle(0x333333, 0.8);
+    g.fillStyle(0x111111, 0.9);
     g.fillRoundedRect(x, y, width, BAR_HEIGHT, 4);
+
+    // Inner shadow
+    g.lineStyle(2, 0x000000, 1);
+    g.strokeRoundedRect(x, y, width, BAR_HEIGHT, 4);
 
     // Health fill
     const healthColor = ratio > 0.5 ? COLORS.healthGreen
@@ -72,17 +76,22 @@ export class HUD {
       : COLORS.healthRed;
 
     const fillWidth = width * ratio;
-    if (mirrored) {
+    
+    if (fillWidth > 0) {
+      const startX = mirrored ? x + width - fillWidth : x;
+      
+      // Main color
       g.fillStyle(healthColor, 1);
-      g.fillRoundedRect(x + width - fillWidth, y, fillWidth, BAR_HEIGHT, 4);
-    } else {
-      g.fillStyle(healthColor, 1);
-      g.fillRoundedRect(x, y, fillWidth, BAR_HEIGHT, 4);
+      g.fillRoundedRect(startX, y, fillWidth, BAR_HEIGHT, 4);
+      
+      // Gloss top highlight
+      g.fillStyle(0xffffff, 0.25);
+      g.fillRoundedRect(startX, y, fillWidth, BAR_HEIGHT / 2, 4);
     }
 
-    // Border
-    g.lineStyle(2, 0xffffff, 0.6);
-    g.strokeRoundedRect(x, y, width, BAR_HEIGHT, 4);
+    // Outer Glowing Border
+    g.lineStyle(3, 0xffffff, 0.9);
+    g.strokeRoundedRect(x - 2, y - 2, width + 4, BAR_HEIGHT + 4, 6);
 
     // HP text
     const hpText = `${Math.ceil(hp)}`;
