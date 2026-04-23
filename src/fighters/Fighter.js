@@ -12,11 +12,11 @@ import {
   KNOCKBACK_HEAVY,
   GROUND_Y,
 } from '../config/constants.js';
-import { BoneSystem } from './BoneSystem.js';
-import { getSkeletonConfig } from '../config/skeletons.js';
 import { SoundManager } from '../audio/SoundManager.js';
+import { sampleAnimationPose, blendPose } from './animationClips.js';
+import { WarriorRenderer } from './WarriorRenderer.js';
+import { getFighterProfile } from '../config/fighterProfiles.js';
 
-// State durations in ms
 const STATE_DURATIONS = {
   lightAttack: 300,
   heavyAttack: 500,
@@ -24,14 +24,13 @@ const STATE_DURATIONS = {
   hit: 300,
   defeated: 1000,
   victory: 1500,
-  blocking: 0, // held state
+  blocking: 0,
 };
 
-// Attack windows — when during the attack animation the hitbox is active (normalized 0-1)
 const ATTACK_WINDOWS = {
-  lightAttack: { start: 0.3, end: 0.6 },
-  heavyAttack: { start: 0.35, end: 0.55 },
-  special: { start: 0.25, end: 0.65 },
+  lightAttack: { start: 0.34, end: 0.62 },
+  heavyAttack: { start: 0.4, end: 0.62 },
+  special: { start: 0.3, end: 0.7 },
 };
 
 export class Fighter {
@@ -39,8 +38,8 @@ export class Fighter {
     this.scene = scene;
     this.config = warriorConfig;
     this.playerIndex = playerIndex;
+    this.profile = getFighterProfile(warriorConfig.id);
 
-    // Stats scaled by warrior multipliers
     this.maxHp = Math.round(DEFAULT_FIGHTER_HP * warriorConfig.health);
     this.hp = this.maxHp;
     this.specialMeter = 0;
@@ -48,7 +47,6 @@ export class Fighter {
     this.jumpForce = DEFAULT_FIGHTER_JUMP_FORCE;
     this.attackPower = warriorConfig.power;
 
-    // Physics body — invisible rectangle
     this.sprite = scene.physics.add.sprite(x, y, '__DEFAULT');
     this.sprite.setVisible(false);
     this.sprite.setSize(50, 100);
@@ -57,37 +55,25 @@ export class Fighter {
     this.sprite.body.setMaxVelocityY(1200);
     this.sprite.setData('fighter', this);
 
-    // Bone animation system (replaces old Graphics-based drawing)
-    const skeletonConfig = getSkeletonConfig(warriorConfig.id);
-    this.boneSystem = new BoneSystem(scene, skeletonConfig, warriorConfig.id);
+    this.renderer = new WarriorRenderer(scene, warriorConfig);
 
-    // State machine
     this.state = 'idle';
     this.stateTimer = 0;
+    this.stateElapsed = 0;
     this.facingRight = facingRight;
     this.isGrounded = true;
     this.isCrouching = false;
 
-    // Combat tracking
     this.hasHitThisAttack = false;
     this.comboCount = 0;
     this.lastAttackTime = 0;
 
-    // Animation frame
-    this.animFrame = 0;
-    this.animTimer = 0;
+    this.bodyParts = sampleAnimationPose('idle', 0, this.profile, {
+      verticalVelocity: 0,
+      facingRight,
+      grounded: true,
+    });
 
-    // Body part positions (for drawing)
-    this.bodyParts = {
-      headY: 0,
-      torsoAngle: 0,
-      armAngle: 0,
-      weaponAngle: 0,
-      legSpread: 0,
-      crouchFactor: 0,
-    };
-
-    // Match stats
     this.stats = {
       hitsLanded: 0,
       damageDealt: 0,
@@ -112,25 +98,20 @@ export class Fighter {
   getAttackHitbox() {
     if (!this.isAttacking()) return null;
 
-    const progress = this.stateTimer > 0
-      ? 1 - (this.stateTimer / STATE_DURATIONS[this.state])
-      : 0;
+    const duration = STATE_DURATIONS[this.state] || 1;
+    const progress = Phaser.Math.Clamp(this.stateElapsed / duration, 0, 1);
     const window = ATTACK_WINDOWS[this.state];
     if (!window || progress < window.start || progress > window.end) return null;
 
-    // Set reach based on attack type (increased to cover the internal body gap)
-    const reach = this.state === 'special' ? 130 : (this.state === 'heavyAttack' ? 115 : 100);
-    
-    // Start the hitbox slightly behind the character (-15) so we don't have a blind spot 
-    // for enemies standing intimately close. If facing left, shift the coordinate box back by total reach.
+    const reach = this.state === 'special' ? 132 : (this.state === 'heavyAttack' ? 118 : 100);
     const xBase = this.sprite.x;
     const boxX = this.facingRight ? xBase - 15 : xBase + 15 - reach;
 
     return {
       x: boxX,
-      y: this.sprite.y - 70,
+      y: this.sprite.y - 74,
       width: reach,
-      height: 50,
+      height: 54,
     };
   }
 
@@ -146,15 +127,10 @@ export class Fighter {
     return this.hp > 0;
   }
 
-  // --- Input handling ---
-
   handleInput(input) {
     if (!this.isAlive() || this.state === 'defeated' || this.state === 'victory') return;
-
-    // Can't act during attack/hit recovery
     if (!this.isActionable() && this.state !== 'jumping') return;
 
-    // Special move
     if (input.special && this.specialMeter >= SPECIAL_METER_MAX && (this.isActionable() || this.state === 'jumping')) {
       this.enterState('special');
       this.specialMeter = 0;
@@ -162,37 +138,36 @@ export class Fighter {
       return;
     }
 
-    // Attacks
     if (input.lightAttack && (this.isActionable() || this.state === 'jumping')) {
       this.enterState('lightAttack');
       return;
     }
+
     if (input.heavyAttack && (this.isActionable() || this.state === 'jumping')) {
       this.enterState('heavyAttack');
       return;
     }
 
-    // Block — hold to maintain, release to exit
     if (input.block && this.isActionable()) {
       this.enterState('blocking');
       return;
     }
+
     if (!input.block && this.state === 'blocking') {
       this.enterState('idle');
     }
 
-    // Crouch — hold to maintain, release to exit
     if (input.crouch && this.isGrounded && this.state !== 'jumping') {
       this.isCrouching = true;
       this.enterState('crouching');
       return;
     }
+
     if (!input.crouch && this.state === 'crouching') {
       this.isCrouching = false;
       this.enterState('idle');
     }
 
-    // Jump
     if (input.jump && this.isGrounded && this.state !== 'jumping') {
       this.sprite.setVelocityY(this.jumpForce);
       this.isGrounded = false;
@@ -200,7 +175,6 @@ export class Fighter {
       return;
     }
 
-    // Movement
     if (input.left) {
       this.sprite.setVelocityX(-this.speed);
       if (this.isGrounded) this.enterState('walking');
@@ -225,24 +199,19 @@ export class Fighter {
     }
   }
 
-  // --- State machine ---
-
   enterState(newState) {
     if (this.state === newState && newState !== 'hit') return;
 
     this.state = newState;
     this.stateTimer = STATE_DURATIONS[newState] || 0;
+    this.stateElapsed = 0;
     this.hasHitThisAttack = false;
-    this.animFrame = 0;
-    this.animTimer = 0;
 
-    // SFX
     if (newState === 'lightAttack') SoundManager.playCombat(this.scene, 'light_attack');
     else if (newState === 'heavyAttack') SoundManager.playCombat(this.scene, 'heavy_attack');
     else if (newState === 'special') SoundManager.playCombat(this.scene, 'special');
     else if (newState === 'jumping') SoundManager.playCombat(this.scene, 'jump');
 
-    // Stop horizontal velocity during attacks and hit stun only if on ground
     if (newState === 'lightAttack' || newState === 'heavyAttack' ||
         newState === 'special' || newState === 'hit' || newState === 'blocking') {
       if (this.isGrounded) {
@@ -252,7 +221,6 @@ export class Fighter {
   }
 
   update(time, delta) {
-    // Clamp to ground (only when falling, not when jumping up)
     if (this.sprite.y > GROUND_Y) {
       this.sprite.y = GROUND_Y;
       if (this.sprite.body.velocity.y > 0) {
@@ -261,12 +229,11 @@ export class Fighter {
     }
 
     const wasGrounded = this.isGrounded;
-    // Ground detection — physics collision OR manual ground check
     const atGround = this.sprite.y >= GROUND_Y && this.sprite.body.velocity.y >= 0;
     this.isGrounded = this.sprite.body.blocked.down || this.sprite.body.touching.down || atGround;
 
-    // Handle landing on the ground
     if (!wasGrounded && this.isGrounded) {
+      this.spawnLandingDust();
       if (this.state === 'jumping') {
         this.enterState('idle');
       } else if (this.isAttacking() || this.state === 'hit' || this.state === 'blocking') {
@@ -276,165 +243,70 @@ export class Fighter {
       this.enterState('idle');
     }
 
-    // Update state timer
     if (this.stateTimer > 0) {
       this.stateTimer -= delta;
+      this.stateElapsed += delta;
+
       if (this.stateTimer <= 0) {
         this.stateTimer = 0;
-        // Return to idle after timed states
         if (this.state === 'lightAttack' || this.state === 'heavyAttack' ||
             this.state === 'special' || this.state === 'hit') {
           this.enterState('idle');
         }
-        if (this.state === 'defeated') {
-          // Stay defeated
-        }
       }
+    } else {
+      this.stateElapsed += delta;
     }
 
-    // Update animation
-    this.animTimer += delta;
-    if (this.animTimer > 100) {
-      this.animTimer = 0;
-      this.animFrame = (this.animFrame + 1) % 4;
-    }
-
-    // Update body part positions for drawing
     this.updateBodyParts(delta);
-
-    // Draw the fighter
     this.draw();
   }
 
   updateBodyParts(delta) {
-    const t = this.animFrame;
-    const progress = this.stateTimer > 0
-      ? 1 - (this.stateTimer / (STATE_DURATIONS[this.state] || 1))
-      : 0;
+    const targetPose = sampleAnimationPose(this.state, this.stateElapsed, this.profile, {
+      verticalVelocity: this.sprite.body.velocity.y,
+      horizontalVelocity: this.sprite.body.velocity.x,
+      grounded: this.isGrounded,
+      facingRight: this.facingRight,
+    });
 
-    switch (this.state) {
-      case 'idle':
-        this.bodyParts.headY = Math.sin(Date.now() / 500) * 2;
-        this.bodyParts.torsoAngle = 0;
-        this.bodyParts.armAngle = 10;
-        this.bodyParts.weaponAngle = 30;
-        this.bodyParts.legSpread = 15;
-        this.bodyParts.crouchFactor = 0;
-        break;
-      case 'walking':
-        this.bodyParts.headY = Math.sin(Date.now() / 200) * 3;
-        this.bodyParts.torsoAngle = 5;
-        this.bodyParts.armAngle = Math.sin(Date.now() / 200) * 20;
-        this.bodyParts.weaponAngle = 30;
-        this.bodyParts.legSpread = 20 + Math.sin(Date.now() / 150) * 15;
-        this.bodyParts.crouchFactor = 0;
-        break;
-      case 'jumping':
-        this.bodyParts.headY = -5;
-        this.bodyParts.torsoAngle = -5;
-        this.bodyParts.armAngle = -30;
-        this.bodyParts.weaponAngle = -45;
-        this.bodyParts.legSpread = 25;
-        this.bodyParts.crouchFactor = 0;
-        break;
-      case 'crouching':
-        this.bodyParts.headY = 20;
-        this.bodyParts.torsoAngle = 10;
-        this.bodyParts.armAngle = 20;
-        this.bodyParts.weaponAngle = 30;
-        this.bodyParts.legSpread = 25;
-        this.bodyParts.crouchFactor = 0.4;
-        break;
-      case 'lightAttack':
-        this.bodyParts.headY = 0;
-        this.bodyParts.torsoAngle = progress < 0.3 ? -10 : 15;
-        this.bodyParts.armAngle = progress < 0.3 ? -40 : 70;
-        this.bodyParts.weaponAngle = progress < 0.3 ? -60 : 30;
-        this.bodyParts.legSpread = 20;
-        this.bodyParts.crouchFactor = 0;
-        break;
-      case 'heavyAttack':
-        this.bodyParts.headY = 0;
-        if (progress < 0.35) {
-          this.bodyParts.torsoAngle = -15;
-          this.bodyParts.armAngle = -60;
-          this.bodyParts.weaponAngle = -90;
-        } else {
-          this.bodyParts.torsoAngle = 25;
-          this.bodyParts.armAngle = 90;
-          this.bodyParts.weaponAngle = 45;
-        }
-        this.bodyParts.legSpread = 25;
-        this.bodyParts.crouchFactor = 0;
-        break;
-      case 'special':
-        this.bodyParts.headY = -3;
-        this.bodyParts.torsoAngle = progress < 0.25 ? -20 : 30;
-        this.bodyParts.armAngle = progress < 0.25 ? -70 : 100;
-        this.bodyParts.weaponAngle = progress < 0.25 ? -100 : 60;
-        this.bodyParts.legSpread = 30;
-        this.bodyParts.crouchFactor = 0;
-        break;
-      case 'blocking':
-        this.bodyParts.headY = 0;
-        this.bodyParts.torsoAngle = -10;
-        this.bodyParts.armAngle = -20;
-        this.bodyParts.weaponAngle = -70;
-        this.bodyParts.legSpread = 20;
-        this.bodyParts.crouchFactor = 0;
-        break;
-      case 'hit':
-        this.bodyParts.headY = 5;
-        this.bodyParts.torsoAngle = -15;
-        this.bodyParts.armAngle = -30;
-        this.bodyParts.weaponAngle = -40;
-        this.bodyParts.legSpread = 10;
-        this.bodyParts.crouchFactor = 0;
-        break;
-      case 'defeated':
-        this.bodyParts.headY = 40;
-        this.bodyParts.torsoAngle = 60;
-        this.bodyParts.armAngle = 50;
-        this.bodyParts.weaponAngle = 90;
-        this.bodyParts.legSpread = 30;
-        this.bodyParts.crouchFactor = 0.6;
-        break;
-      case 'victory':
-        this.bodyParts.headY = -10;
-        this.bodyParts.torsoAngle = -5;
-        this.bodyParts.armAngle = -120;
-        this.bodyParts.weaponAngle = -130;
-        this.bodyParts.legSpread = 20;
-        this.bodyParts.crouchFactor = 0;
-        break;
-    }
+    const blendTime = this.isAttacking() || this.state === 'hit' ? 65 : 120;
+    const alpha = Phaser.Math.Clamp(delta / blendTime, 0, 1);
+    this.bodyParts = blendPose(this.bodyParts, targetPose, alpha);
   }
 
   draw() {
-    const x = this.sprite.x;
-    const baseY = this.sprite.y;
-
-    // Apply bodyParts state to bone rotations and render
-    this.boneSystem.applyBodyParts(this.bodyParts);
-    this.boneSystem.render(x, baseY, this.facingRight);
-
-    // Special meter glow when full
-    if (this.specialMeter >= SPECIAL_METER_MAX) {
-      if (!this.glowGraphics) {
-        this.glowGraphics = this.scene.add.graphics();
-        this.glowGraphics.setDepth(11);
-      }
-      this.glowGraphics.clear();
-      const accent = parseInt(this.config.colors.accent.replace('#', ''), 16);
-      const torsoY = baseY - 55 + this.bodyParts.crouchFactor * 30;
-      this.glowGraphics.lineStyle(2, accent, 0.5 + Math.sin(Date.now() / 200) * 0.3);
-      this.glowGraphics.strokeCircle(x, torsoY, 45);
-    } else if (this.glowGraphics) {
-      this.glowGraphics.clear();
-    }
+    this.renderer.render(
+      this.sprite.x,
+      this.sprite.y,
+      this.facingRight,
+      this.bodyParts,
+      this.state,
+      this.specialMeter / SPECIAL_METER_MAX,
+    );
   }
 
-  // --- Damage handling ---
+  spawnLandingDust() {
+    const color = this.profile.fx.dustColor;
+    const burstY = this.sprite.y - 4;
+    const offsets = [-24, -12, 0, 12, 24];
+
+    for (const offset of offsets) {
+      const puff = this.scene.add.ellipse(this.sprite.x + offset, burstY, 14, 8, color, 0.5);
+      puff.setDepth(9);
+      this.scene.tweens.add({
+        targets: puff,
+        x: puff.x + offset * 0.5,
+        y: puff.y - 10 - Math.abs(offset) * 0.08,
+        scaleX: 1.8,
+        scaleY: 1.5,
+        alpha: 0,
+        duration: 260,
+        ease: 'Quad.easeOut',
+        onComplete: () => puff.destroy(),
+      });
+    }
+  }
 
   takeDamage(amount, attackerX, isHeavy, isSpecial) {
     const wasBlocking = this.state === 'blocking';
@@ -446,7 +318,6 @@ export class Fighter {
 
     this.hp = Math.max(0, this.hp - actualDamage);
 
-    // Knockback
     const dir = attackerX < this.sprite.x ? 1 : -1;
     const knockback = isHeavy ? KNOCKBACK_HEAVY : KNOCKBACK_LIGHT;
     this.sprite.setVelocityX(knockback * dir);
@@ -482,21 +353,26 @@ export class Fighter {
       default:
         return 0;
     }
+
     return Math.round(base * this.attackPower);
   }
 
-  // --- Round management ---
-
   resetForRound(x, facingRight) {
     this.hp = this.maxHp;
-    // Special meter carries between rounds
     this.sprite.setPosition(x, GROUND_Y);
     this.sprite.setVelocity(0, 0);
     this.facingRight = facingRight;
     this.state = 'idle';
     this.stateTimer = 0;
+    this.stateElapsed = 0;
     this.hasHitThisAttack = false;
     this.isCrouching = false;
+    this.isGrounded = true;
+    this.bodyParts = sampleAnimationPose('idle', 0, this.profile, {
+      verticalVelocity: 0,
+      facingRight,
+      grounded: true,
+    });
   }
 
   resetForMatch() {
@@ -507,7 +383,6 @@ export class Fighter {
 
   destroy() {
     this.sprite.destroy();
-    this.boneSystem.destroy();
-    if (this.glowGraphics) this.glowGraphics.destroy();
+    this.renderer.destroy();
   }
 }

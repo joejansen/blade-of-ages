@@ -5,7 +5,7 @@ import { InputManager } from '../combat/InputManager.js';
 import { AIController } from '../ai/AIController.js';
 import { HUD } from '../ui/HUD.js';
 import { SoundManager } from '../audio/SoundManager.js';
-import { drawArena } from '../art/arenas.js';
+import { ArenaRenderer } from '../art/ArenaRenderer.js';
 import { getWarriorById } from '../config/warriors.js';
 import {
   GAME_WIDTH,
@@ -33,8 +33,7 @@ export class FightScene extends Phaser.Scene {
   create() {
     const { mode, warrior1Id, warrior2Id, arenaId } = this.matchData;
 
-    // Draw arena background
-    drawArena(this, arenaId);
+    this.arenaRenderer = new ArenaRenderer(this, arenaId);
 
     // Draw ground line
     const groundLine = this.add.graphics();
@@ -87,6 +86,8 @@ export class FightScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    this.arenaRenderer?.update(time, delta);
+
     // Round state management
     switch (this.roundState) {
       case 'starting':
@@ -288,6 +289,7 @@ export class FightScene extends Phaser.Scene {
   }
 
   cleanUp() {
+    this.arenaRenderer?.destroy();
     this.fighter1?.destroy();
     this.fighter2?.destroy();
     this.input1?.destroy();
