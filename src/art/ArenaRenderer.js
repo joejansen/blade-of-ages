@@ -8,13 +8,14 @@ export class ArenaRenderer {
     this.displayObjects = [];
 
     const textureKey = `arena_${arenaId}`;
-    if (scene.textures.exists(textureKey) && scene.textures.get(textureKey).key !== '__MISSING') {
+    this.hasTextureBackground = scene.textures.exists(textureKey) && scene.textures.get(textureKey).key !== '__MISSING';
+    if (this.hasTextureBackground) {
       const background = scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, textureKey);
       background.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
       background.setDepth(0);
       this.displayObjects.push(background);
     } else {
-      this.displayObjects.push(drawArena(scene, arenaId));
+      this.displayObjects.push(drawArena(scene, arenaId, { includeFloor: false }));
     }
 
     this.midGraphics = scene.add.graphics().setDepth(1);
@@ -22,6 +23,7 @@ export class ArenaRenderer {
     this.floorGraphics = scene.add.graphics().setDepth(6);
     this.displayObjects.push(this.midGraphics, this.fxGraphics, this.floorGraphics);
 
+    this.floorGraphics.clear();
     this.drawStaticFloor();
   }
 
@@ -30,8 +32,6 @@ export class ArenaRenderer {
 
     this.midGraphics.clear();
     this.fxGraphics.clear();
-    this.floorGraphics.clear();
-    this.drawStaticFloor();
 
     switch (this.arenaId) {
       case 'castle':

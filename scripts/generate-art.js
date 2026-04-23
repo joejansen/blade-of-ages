@@ -346,7 +346,7 @@ async function generateWarrior(warriorId, options = {}) {
   const prompts = WARRIOR_PROMPTS[warriorId];
   if (!prompts) {
     console.error(`Unknown warrior: ${warriorId}`);
-    return { success: 0, failed: 0 };
+    return { success: 0, failed: 1 };
   }
 
   const outDir = path.join(ASSETS_DIR, warriorId);
@@ -446,6 +446,7 @@ async function main() {
   console.log(`Assets: ${ASSETS_DIR}`);
   console.log(`Concept sheets: ${CONCEPT_DIR}`);
   if (totalFailed > 0) {
+    process.exitCode = 1;
     console.log(`Re-run failed warriors: node scripts/generate-art.js <warrior_id> --force`);
   }
 }

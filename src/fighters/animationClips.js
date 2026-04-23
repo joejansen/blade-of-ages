@@ -12,6 +12,8 @@ const DEFAULT_POSE = {
   glow: 0,
 };
 
+const POSE_KEYS = Object.keys(DEFAULT_POSE);
+
 const CLIPS = {
   idle: {
     loop: true,
@@ -165,13 +167,8 @@ function sampleKeyframes(clip, progress) {
 
     const localT = to.t === from.t ? 0 : (progress - from.t) / (to.t - from.t);
     const pose = { ...DEFAULT_POSE };
-    const keys = new Set([
-      ...Object.keys(DEFAULT_POSE),
-      ...Object.keys(from.values || {}),
-      ...Object.keys(to.values || {}),
-    ]);
 
-    for (const key of keys) {
+    for (const key of POSE_KEYS) {
       const start = from.values?.[key] ?? DEFAULT_POSE[key] ?? 0;
       const end = to.values?.[key] ?? DEFAULT_POSE[key] ?? 0;
       pose[key] = interpolate(start, end, localT);
@@ -246,9 +243,8 @@ export function sampleAnimationPose(state, elapsedMs, profile, context = {}) {
 
 export function blendPose(currentPose, targetPose, alpha) {
   const blended = {};
-  const keys = new Set([...Object.keys(DEFAULT_POSE), ...Object.keys(currentPose), ...Object.keys(targetPose)]);
 
-  for (const key of keys) {
+  for (const key of POSE_KEYS) {
     const current = currentPose[key] ?? DEFAULT_POSE[key] ?? 0;
     const target = targetPose[key] ?? DEFAULT_POSE[key] ?? 0;
     blended[key] = current + (target - current) * alpha;

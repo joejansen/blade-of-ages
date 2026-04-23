@@ -1,6 +1,7 @@
 import { GAME_WIDTH, GAME_HEIGHT, GROUND_Y } from '../config/constants.js';
 
-export function drawArena(scene, arenaId) {
+export function drawArena(scene, arenaId, options = {}) {
+  const { includeFloor = true } = options;
   const textureKey = `arena_${arenaId}`;
 
   // If a high-res AI-generated background JPG is loaded, use it!
@@ -8,11 +9,13 @@ export function drawArena(scene, arenaId) {
     const bg = scene.add.image(0, 0, textureKey).setOrigin(0, 0);
     bg.setDepth(0);
 
-    // Provide a subtle dark floor overlay to physically ground the fighters
-    const g = scene.add.graphics();
-    g.setDepth(0);
-    g.fillStyle(0x000000, 0.15);
-    g.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
+    if (includeFloor) {
+      // Provide a subtle dark floor overlay to physically ground the fighters
+      const g = scene.add.graphics();
+      g.setDepth(0);
+      g.fillStyle(0x000000, 0.15);
+      g.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
+    }
 
     return bg;
   }
@@ -24,9 +27,11 @@ export function drawArena(scene, arenaId) {
   const drawFn = ARENA_DRAW_FUNCTIONS[arenaId] || drawCastle;
   drawFn(g);
 
-  // Ground platform
-  g.fillStyle(0x000000, 0.15);
-  g.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
+  if (includeFloor) {
+    // Ground platform
+    g.fillStyle(0x000000, 0.15);
+    g.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
+  }
 
   return g;
 }

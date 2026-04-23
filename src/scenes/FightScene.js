@@ -35,15 +35,6 @@ export class FightScene extends Phaser.Scene {
 
     this.arenaRenderer = new ArenaRenderer(this, arenaId);
 
-    // Draw ground line
-    const groundLine = this.add.graphics();
-    groundLine.lineStyle(2, 0x000000, 0.3);
-    groundLine.beginPath();
-    groundLine.moveTo(0, GROUND_Y);
-    groundLine.lineTo(GAME_WIDTH, GROUND_Y);
-    groundLine.stroke();
-    groundLine.setDepth(5);
-
     // Set world bounds
     this.physics.world.setBounds(30, 0, GAME_WIDTH - 60, GROUND_Y);
 
