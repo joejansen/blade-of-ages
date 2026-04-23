@@ -11,6 +11,7 @@ import sharp from "sharp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS_DIR = path.join(__dirname, "..", "public", "assets", "warriors");
+const CONCEPT_DIR = path.join(__dirname, "..", "public", "assets", "concepts");
 
 const API_KEY = process.env.GEMINI_API_KEY;
 if (!API_KEY) {
@@ -31,8 +32,11 @@ const BODY_PARTS = [
   "weapon",
 ];
 
-const STYLE_PREFIX =
-  "A single isolated doll cutout piece on a solid bright green (#00FF00) background. This is ONE disconnected body part for a 2D puppet character, NOT a full character. The piece floats alone in the center of the image with nothing else around it. Hand drawn art style, strong black outlines, flat vibrant colors. Side view facing right. IMPORTANT: Orient the piece VERTICALLY — the connection joint (where it attaches to the body) should be at the TOP of the image, and the piece extends DOWNWARD.";
+const SHEET_STYLE_PREFIX =
+  "A polished 2D fighting game character model sheet on a clean neutral background. Show one full-body side-view fighter facing right as the hero pose, plus smaller secondary callouts that clarify silhouette, costume layers, weapon, and color blocking. Hand-drawn art style, bold readable shapes, strong black outlines, vibrant but controlled colors, and consistent historical design details.";
+
+const PART_STYLE_PREFIX =
+  "An isolated production-ready body part sprite for a 2D fighting game puppet, derived from an approved full-character model sheet. Preserve the exact silhouette language, material rendering, costume detail, and palette from the approved character design. Put the part on a solid bright green (#00FF00) background with nothing else in frame. Side view facing right. Orient the piece vertically so the connection joint is at the top and the part extends downward.";
 
 const WARRIOR_PROMPTS = {
   knight: {
@@ -206,6 +210,8 @@ const WARRIOR_PROMPTS = {
 };
 
 // Aspect ratios per body part type
+const SHEET_CONFIG = { aspectRatio: "3:4" };
+
 const PART_CONFIG = {
   head: { aspectRatio: "1:1" },
   torso: { aspectRatio: "3:4" },
@@ -284,11 +290,63 @@ async function chromaKey(inputBuffer, tolerance = 80) {
   return sharp(pngBuffer).trim().png().toBuffer();
 }
 
-async function generateWarrior(warriorId) {
+function buildCharacterSheetPrompt(warriorId) {
+  const prompts = WARRIOR_PROMPTS[warriorId];
+  if (!prompts) {
+    throw new Error(`Unknown warrior: ${warriorId}`);
+  }
+
+  return [
+    SHEET_STYLE_PREFIX,
+    prompts.style,
+    `Core design notes: ${prompts.head} ${prompts.torso}`,
+    `Weapon design: ${prompts.weapon}`,
+    "The pose should feel battle-ready and grounded, with readable weight distribution and a clear striking silhouette.",
+  ].join(" ");
+}
+
+function buildPartPrompt(warriorId, part) {
+  const prompts = WARRIOR_PROMPTS[warriorId];
+  if (!prompts) {
+    throw new Error(`Unknown warrior: ${warriorId}`);
+  }
+
+  return [
+    PART_STYLE_PREFIX,
+    `Approved character sheet summary: ${buildCharacterSheetPrompt(warriorId)}`,
+    prompts.style,
+    prompts[part],
+  ].join(" ");
+}
+
+async function generateCharacterSheet(warriorId) {
+  const outFile = path.join(CONCEPT_DIR, `${warriorId}.png`);
+  fs.mkdirSync(CONCEPT_DIR, { recursive: true });
+
+  if (fs.existsSync(outFile) && !process.argv.includes("--force")) {
+    console.log(`  [skip] concept: ${warriorId}.png (exists, use --force to regenerate)`);
+    return true;
+  }
+
+  console.log(`  [sheet] ${warriorId}.png ...`);
+
+  try {
+    const rawBuffer = await generateImage(buildCharacterSheetPrompt(warriorId), SHEET_CONFIG.aspectRatio);
+    const imageBuffer = await sharp(rawBuffer).png().toBuffer();
+    fs.writeFileSync(outFile, imageBuffer);
+    console.log(`  [ok]   concept: ${warriorId}.png (${imageBuffer.length} bytes)`);
+    return true;
+  } catch (err) {
+    console.error(`  [FAIL] concept: ${warriorId}.png — ${err.message}`);
+    return false;
+  }
+}
+
+async function generateWarrior(warriorId, options = {}) {
   const prompts = WARRIOR_PROMPTS[warriorId];
   if (!prompts) {
     console.error(`Unknown warrior: ${warriorId}`);
-    return { success: 0, failed: 0 };
+    return { success: 0, failed: 1 };
   }
 
   const outDir = path.join(ASSETS_DIR, warriorId);
@@ -296,6 +354,24 @@ async function generateWarrior(warriorId) {
 
   let success = 0;
   let failed = 0;
+
+  if (!options.partsOnly) {
+    const sheetOk = await generateCharacterSheet(warriorId);
+    if (!sheetOk && options.sheetOnly) {
+      return { success, failed: failed + 1 };
+    }
+    if (sheetOk) {
+      success++;
+    } else {
+      failed++;
+    }
+
+    if (options.sheetOnly) {
+      return { success, failed };
+    }
+
+    await new Promise((r) => setTimeout(r, 2000));
+  }
 
   for (const part of BODY_PARTS) {
     const outFile = path.join(outDir, `${part}.png`);
@@ -309,7 +385,7 @@ async function generateWarrior(warriorId) {
       continue;
     }
 
-    const fullPrompt = `${STYLE_PREFIX} ${prompts.style} ${prompts[part]}`;
+    const fullPrompt = buildPartPrompt(warriorId, part);
     const config = PART_CONFIG[part];
 
     console.log(`  [gen]  ${warriorId}/${part}.png ...`);
@@ -335,7 +411,15 @@ async function generateWarrior(warriorId) {
 }
 
 async function main() {
-  const targetWarrior = process.argv[2];
+  const targetWarrior = process.argv.slice(2).find((arg) => !arg.startsWith("--"));
+  const sheetOnly = process.argv.includes("--sheet-only");
+  const partsOnly = process.argv.includes("--parts-only");
+
+  if (sheetOnly && partsOnly) {
+    console.error("Error: choose either --sheet-only or --parts-only, not both.");
+    process.exit(1);
+  }
+
   const warriors = targetWarrior
     ? [targetWarrior]
     : Object.keys(WARRIOR_PROMPTS);
@@ -343,15 +427,16 @@ async function main() {
   console.log(`\nBlade of Ages — Art Generator`);
   console.log(`Model: ${API_URL.split("/models/")[1].split(":")[0]}`);
   console.log(`Warriors: ${warriors.join(", ")}`);
+  console.log(`Mode: ${sheetOnly ? "concept sheets only" : partsOnly ? "production parts only" : "concept sheets + production parts"}`);
   console.log(`Parts per warrior: ${BODY_PARTS.length}`);
-  console.log(`Total images: ${warriors.length * BODY_PARTS.length}\n`);
+  console.log(`Total outputs: ${warriors.length * (sheetOnly ? 1 : partsOnly ? BODY_PARTS.length : BODY_PARTS.length + 1)}\n`);
 
   let totalSuccess = 0;
   let totalFailed = 0;
 
   for (const warrior of warriors) {
     console.log(`\n--- ${warrior.toUpperCase()} ---`);
-    const { success, failed } = await generateWarrior(warrior);
+    const { success, failed } = await generateWarrior(warrior, { sheetOnly, partsOnly });
     totalSuccess += success;
     totalFailed += failed;
   }
@@ -359,10 +444,10 @@ async function main() {
   console.log(`\n========================================`);
   console.log(`Done! ${totalSuccess} succeeded, ${totalFailed} failed.`);
   console.log(`Assets: ${ASSETS_DIR}`);
+  console.log(`Concept sheets: ${CONCEPT_DIR}`);
   if (totalFailed > 0) {
-    console.log(
-      `Re-run failed warriors: node scripts/generate-art.js <warrior_id> --force`,
-    );
+    process.exitCode = 1;
+    console.log(`Re-run failed warriors: node scripts/generate-art.js <warrior_id> --force`);
   }
 }
 
