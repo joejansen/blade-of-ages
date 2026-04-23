@@ -106,7 +106,7 @@ export class ArenaRenderer {
       this.midGraphics.lineStyle(2, 0x8cc7d8, 0.22);
       this.midGraphics.beginPath();
       this.midGraphics.moveTo(i * 220 - 20, y);
-      this.midGraphics.quadraticCurveTo(i * 220 + 70, y - 10, i * 220 + 160, y);
+      this.drawQuadraticPath(this.midGraphics, i * 220 - 20, y, i * 220 + 70, y - 10, i * 220 + 160, y);
       this.midGraphics.strokePath();
     }
 
@@ -168,7 +168,7 @@ export class ArenaRenderer {
       this.midGraphics.lineStyle(2, 0x8bb9c7, 0.18);
       this.midGraphics.beginPath();
       this.midGraphics.moveTo(i * 260, y);
-      this.midGraphics.quadraticCurveTo(i * 260 + 90, y - 8, i * 260 + 180, y);
+      this.drawQuadraticPath(this.midGraphics, i * 260, y, i * 260 + 90, y - 8, i * 260 + 180, y);
       this.midGraphics.strokePath();
     }
   }
@@ -245,9 +245,19 @@ export class ArenaRenderer {
       this.fxGraphics.lineStyle(10, color, alpha);
       this.fxGraphics.beginPath();
       this.fxGraphics.moveTo(0, y + drift);
-      this.fxGraphics.quadraticCurveTo(GAME_WIDTH * 0.35, y - drift, GAME_WIDTH * 0.7, y + drift * 0.8);
-      this.fxGraphics.quadraticCurveTo(GAME_WIDTH * 0.85, y + drift * 1.2, GAME_WIDTH, y - drift * 0.2);
+      this.drawQuadraticPath(this.fxGraphics, 0, y + drift, GAME_WIDTH * 0.35, y - drift, GAME_WIDTH * 0.7, y + drift * 0.8);
+      this.drawQuadraticPath(this.fxGraphics, GAME_WIDTH * 0.7, y + drift * 0.8, GAME_WIDTH * 0.85, y + drift * 1.2, GAME_WIDTH, y - drift * 0.2);
       this.fxGraphics.strokePath();
+    }
+  }
+
+  drawQuadraticPath(graphics, startX, startY, controlX, controlY, endX, endY, segments = 16) {
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      const invT = 1 - t;
+      const x = invT * invT * startX + 2 * invT * t * controlX + t * t * endX;
+      const y = invT * invT * startY + 2 * invT * t * controlY + t * t * endY;
+      graphics.lineTo(x, y);
     }
   }
 
