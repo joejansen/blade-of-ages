@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Fighter } from '../fighters/Fighter.js';
+import { DebugOverlay } from '../fighters/DebugOverlay.js';
 import { CombatManager } from '../combat/CombatManager.js';
 import { InputManager } from '../combat/InputManager.js';
 import { AIController } from '../ai/AIController.js';
@@ -58,6 +59,12 @@ export class FightScene extends Phaser.Scene {
 
     // HUD
     this.hud = new HUD(this, w1Config, w2Config);
+
+    // Debug overlay (F1 to toggle)
+    this.debugOverlay = new DebugOverlay(this);
+    this.input.keyboard.on('keydown-F1', () => {
+      this.debugOverlay.setEnabled(!this.debugOverlay.isEnabled());
+    });
 
     // Round tracking
     this.roundWins = [0, 0];
@@ -155,6 +162,13 @@ export class FightScene extends Phaser.Scene {
     }
     if (this.fighter2.isActionable()) {
       this.fighter2.facingRight = this.fighter1.x > this.fighter2.x;
+    }
+
+    // Debug overlay (drawn on top of production renderer)
+    if (this.debugOverlay.isEnabled()) {
+      this.debugOverlay.clear();
+      this.debugOverlay.drawFighter(this.fighter1);
+      this.debugOverlay.drawFighter(this.fighter2);
     }
 
     // Update HUD
@@ -287,5 +301,6 @@ export class FightScene extends Phaser.Scene {
     this.input2?.destroy();
     this.combatManager?.destroy();
     this.hud?.destroy();
+    this.debugOverlay?.destroy();
   }
 }

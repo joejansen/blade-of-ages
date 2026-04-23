@@ -1,13 +1,8 @@
 import { drawWarrior } from '../art/warriorArt.js';
 import { getFighterProfile } from '../config/fighterProfiles.js';
+import { computeWeaponGeometry } from './weaponGeometry.js';
 
 const AURA_OFFSET_Y = -54;
-const TORSO_OFFSET_Y = -55;
-const CROUCH_OFFSET_Y = 30;
-const HEAD_BOB_FACTOR = 0.25;
-const ARM_OFFSET_X = 10;
-const ARM_OFFSET_Y = -7;
-const ARM_REACH = 30;
 
 export class WarriorRenderer {
   constructor(scene, warriorConfig) {
@@ -62,38 +57,83 @@ export class WarriorRenderer {
 
   drawWeaponTrail(x, y, dir, pose) {
     this.trailGraphics.clear();
-    if (!pose.trailAlpha) {
+    const trail = this.profile.trail;
+    if (!pose.trailAlpha || trail.style === 'none') {
       return;
     }
 
-    const armAngle = pose.armAngle * Math.PI / 180;
-    const weaponAngle = pose.weaponAngle * Math.PI / 180;
-    const torsoY = y + TORSO_OFFSET_Y + pose.crouchFactor * CROUCH_OFFSET_Y + (pose.headY || 0) * HEAD_BOB_FACTOR;
-    const armX = x + ARM_OFFSET_X * dir;
-    const armY = torsoY + ARM_OFFSET_Y;
-    const handX = armX + Math.sin(armAngle) * ARM_REACH * dir;
-    const handY = armY - Math.cos(armAngle) * ARM_REACH;
-    const tipX = handX + Math.sin(weaponAngle) * this.profile.weaponLength * dir;
-    const tipY = handY - Math.cos(weaponAngle) * this.profile.weaponLength;
-    const sweepX = handX + Math.sin(weaponAngle - 0.4) * this.profile.weaponLength * dir;
-    const sweepY = handY - Math.cos(weaponAngle - 0.4) * this.profile.weaponLength;
-    const width = pose.trailWidth || this.profile.weaponWidth;
+    const alpha = pose.trailAlpha * trail.alphaScale;
+    if (alpha <= 0.01) {
+      return;
+    }
+
+    const geom = computeWeaponGeometry(pose, this.profile, x, y, dir);
+    const color = this.profile.fx.trailColor;
+    const width = (pose.trailWidth || this.profile.weaponWidth) * trail.widthScale;
 
     this.trailGraphics.setPosition(this.graphics.x, this.graphics.y);
     this.trailGraphics.setScale(this.profile.renderScale);
-    this.trailGraphics.fillStyle(this.profile.fx.trailColor, pose.trailAlpha * 0.14);
-    this.trailGraphics.beginPath();
-    this.trailGraphics.moveTo(handX, handY);
-    this.trailGraphics.lineTo(tipX, tipY);
-    this.trailGraphics.lineTo(sweepX, sweepY);
-    this.trailGraphics.closePath();
-    this.trailGraphics.fillPath();
 
-    this.trailGraphics.lineStyle(width * 0.22, this.profile.fx.trailColor, pose.trailAlpha * 0.4);
+    if (trail.style === 'thrust' || trail.style === 'stock') {
+      this.drawThrustSmear(geom, dir, width, color, alpha, trail);
+    } else {
+      this.drawArcSmear(geom, trail.sweep, dir, width, color, alpha);
+    }
+  }
+
+  drawArcSmear(geom, sweep, dir, width, color, alpha) {
+    const { handX, handY, tipX, tipY, weaponAngle, weaponLen } = geom;
+    const sweepAngle = weaponAngle - sweep;
+    const sweepX = handX + Math.sin(sweepAngle) * weaponLen * dir;
+    const sweepY = handY - Math.cos(sweepAngle) * weaponLen;
+
+    if (sweep > 0.02) {
+      this.trailGraphics.fillStyle(color, alpha * 0.14);
+      this.trailGraphics.beginPath();
+      this.trailGraphics.moveTo(handX, handY);
+      this.trailGraphics.lineTo(tipX, tipY);
+      this.trailGraphics.lineTo(sweepX, sweepY);
+      this.trailGraphics.closePath();
+      this.trailGraphics.fillPath();
+    }
+
+    const strokeWidth = Math.max(2, width * 0.22);
+    this.trailGraphics.lineStyle(strokeWidth, color, alpha * 0.4);
     this.trailGraphics.beginPath();
     this.trailGraphics.moveTo(handX, handY);
     this.trailGraphics.lineTo(tipX, tipY);
     this.trailGraphics.strokePath();
+  }
+
+  drawThrustSmear(geom, dir, width, color, alpha, trail) {
+    // A thrust reads as motion blur along the blade rather than a cone.
+    // We render a short trailing segment behind the hand to suggest the
+    // weapon is driving forward, plus a softened stroke over the blade.
+    const { handX, handY, tipX, tipY, weaponAngle, weaponLen } = geom;
+    const trailBack = weaponLen * 0.35;
+    const backX = handX - Math.sin(weaponAngle) * trailBack * dir;
+    const backY = handY + Math.cos(weaponAngle) * trailBack;
+
+    const strokeWidth = Math.max(2, width * 0.28);
+    this.trailGraphics.lineStyle(strokeWidth, color, alpha * 0.28);
+    this.trailGraphics.beginPath();
+    this.trailGraphics.moveTo(backX, backY);
+    this.trailGraphics.lineTo(tipX, tipY);
+    this.trailGraphics.strokePath();
+
+    // Optional narrow fill to suggest weight of the weapon as it drives forward.
+    if (trail.sweep > 0.02) {
+      const sweepAngle = weaponAngle - trail.sweep;
+      const sweepX = handX + Math.sin(sweepAngle) * weaponLen * 0.85 * dir;
+      const sweepY = handY - Math.cos(sweepAngle) * weaponLen * 0.85;
+      this.trailGraphics.fillStyle(color, alpha * 0.08);
+      this.trailGraphics.beginPath();
+      this.trailGraphics.moveTo(handX, handY);
+      this.trailGraphics.lineTo(tipX, tipY);
+      this.trailGraphics.lineTo(sweepX, sweepY);
+      this.trailGraphics.closePath();
+      this.trailGraphics.fillPath();
+    }
   }
 
   destroy() {
