@@ -5,6 +5,12 @@ changes. Each fighter should pass every row across every arena background.
 Press **F1** in the fight scene to toggle the debug overlay, which shows
 anchor points, weapon line, and hitboxes.
 
+Fighters now render through `AssetWarriorRenderer`, which drives the PNG
+body parts produced by `scripts/generate-art.js`. If a part is missing the
+renderer transparently falls back to the vector `WarriorRenderer`, so the
+checklist is written in terms of what the fighter should do on screen
+regardless of which path is active.
+
 ## Per-Fighter Rows
 
 For every warrior:

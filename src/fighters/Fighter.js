@@ -15,6 +15,7 @@ import {
 import { SoundManager } from '../audio/SoundManager.js';
 import { sampleAnimationPose, blendPose } from './animationClips.js';
 import { WarriorRenderer } from './WarriorRenderer.js';
+import { AssetWarriorRenderer } from './AssetWarriorRenderer.js';
 import { getFighterProfile } from '../config/fighterProfiles.js';
 
 const STATE_DURATIONS = {
@@ -55,7 +56,16 @@ export class Fighter {
     this.sprite.body.setMaxVelocityY(1200);
     this.sprite.setData('fighter', this);
 
-    this.renderer = new WarriorRenderer(scene, warriorConfig);
+    // Prefer the asset-driven sprite renderer; fall back to the vector
+    // renderer if any part texture is missing so development builds without
+    // the art pipeline output still render a fighter.
+    const assetRenderer = new AssetWarriorRenderer(scene, warriorConfig);
+    if (assetRenderer.isAvailable()) {
+      this.renderer = assetRenderer;
+    } else {
+      assetRenderer.destroy();
+      this.renderer = new WarriorRenderer(scene, warriorConfig);
+    }
 
     this.state = 'idle';
     this.stateTimer = 0;
