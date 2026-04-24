@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Fighter } from '../fighters/Fighter.js';
+import { DebugOverlay } from '../fighters/DebugOverlay.js';
 import { CombatManager } from '../combat/CombatManager.js';
 import { InputManager } from '../combat/InputManager.js';
 import { AIController } from '../ai/AIController.js';
@@ -59,6 +60,12 @@ export class FightScene extends Phaser.Scene {
     // HUD
     this.hud = new HUD(this, w1Config, w2Config);
 
+    // Debug overlay (F1 to toggle)
+    this.debugOverlay = new DebugOverlay(this);
+    this.input.keyboard.on('keydown-F1', () => {
+      this.debugOverlay.setEnabled(!this.debugOverlay.isEnabled());
+    });
+
     // Round tracking
     this.roundWins = [0, 0];
     this.currentRound = 1;
@@ -86,7 +93,7 @@ export class FightScene extends Phaser.Scene {
         if (this.roundTimer <= 0) {
           this.roundState = 'fighting';
         }
-        return;
+        break;
 
       case 'fighting':
         this.updateFighting(time, delta);
@@ -99,7 +106,7 @@ export class FightScene extends Phaser.Scene {
         if (this.roundTimer <= 0) {
           this.startNextRound();
         }
-        return;
+        break;
 
       case 'matchEnd':
         this.roundTimer -= delta;
@@ -108,8 +115,20 @@ export class FightScene extends Phaser.Scene {
         if (this.roundTimer <= 0) {
           this.endMatch();
         }
-        return;
+        break;
     }
+
+    this.drawDebugOverlay();
+  }
+
+  drawDebugOverlay() {
+    if (!this.debugOverlay?.isEnabled()) {
+      this.debugOverlay?.clear();
+      return;
+    }
+    this.debugOverlay.clear();
+    if (this.fighter1) this.debugOverlay.drawFighter(this.fighter1);
+    if (this.fighter2) this.debugOverlay.drawFighter(this.fighter2);
   }
 
   updateFighting(time, delta) {
@@ -287,5 +306,6 @@ export class FightScene extends Phaser.Scene {
     this.input2?.destroy();
     this.combatManager?.destroy();
     this.hud?.destroy();
+    this.debugOverlay?.destroy();
   }
 }
