@@ -93,7 +93,7 @@ export class FightScene extends Phaser.Scene {
         if (this.roundTimer <= 0) {
           this.roundState = 'fighting';
         }
-        return;
+        break;
 
       case 'fighting':
         this.updateFighting(time, delta);
@@ -106,7 +106,7 @@ export class FightScene extends Phaser.Scene {
         if (this.roundTimer <= 0) {
           this.startNextRound();
         }
-        return;
+        break;
 
       case 'matchEnd':
         this.roundTimer -= delta;
@@ -115,8 +115,20 @@ export class FightScene extends Phaser.Scene {
         if (this.roundTimer <= 0) {
           this.endMatch();
         }
-        return;
+        break;
     }
+
+    this.drawDebugOverlay();
+  }
+
+  drawDebugOverlay() {
+    if (!this.debugOverlay?.isEnabled()) {
+      this.debugOverlay?.clear();
+      return;
+    }
+    this.debugOverlay.clear();
+    if (this.fighter1) this.debugOverlay.drawFighter(this.fighter1);
+    if (this.fighter2) this.debugOverlay.drawFighter(this.fighter2);
   }
 
   updateFighting(time, delta) {
@@ -162,13 +174,6 @@ export class FightScene extends Phaser.Scene {
     }
     if (this.fighter2.isActionable()) {
       this.fighter2.facingRight = this.fighter1.x > this.fighter2.x;
-    }
-
-    // Debug overlay (drawn on top of production renderer)
-    if (this.debugOverlay.isEnabled()) {
-      this.debugOverlay.clear();
-      this.debugOverlay.drawFighter(this.fighter1);
-      this.debugOverlay.drawFighter(this.fighter2);
     }
 
     // Update HUD

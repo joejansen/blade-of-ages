@@ -138,33 +138,34 @@ export class AssetWarriorRenderer {
     const anchors = profile.anchors;
     const scale = profile.renderScale;
 
-    // worldBase is where the vector renderer's local origin lives once the
-    // per-frame body translation (bodyY) is applied. Every part position is
-    // computed in this world frame so the whole character translates
-    // together when jumping/crouching without per-part math.
-    const worldX = x + profile.renderOffsetX;
-    const worldBaseY = baseY + profile.renderOffsetY + (pose.bodyY || 0);
+    // worldRefX/worldRefY is the scale pivot — everything below is expressed
+    // as a local offset from that point and then scaled by profile.renderScale
+    // before being placed. bodyY translates the whole character together.
+    const worldRefX = x + profile.renderOffsetX;
+    const worldRefY = baseY + profile.renderOffsetY + (pose.bodyY || 0);
+    const s = (lx, ly) => [worldRefX + lx * scale, worldRefY + ly * scale];
 
-    // Weapon geometry drives the front arm and weapon. Using the shared
-    // helper guarantees the sprite hand coincides with the weapon-trail
-    // origin so the trail lands on the drawn blade.
-    const geom = computeWeaponGeometry(pose, profile, worldX, worldBaseY, dir);
-    const torsoY = worldBaseY + anchors.torsoOffsetY
+    // Weapon geometry already accepts a scale multiplier; passing renderScale
+    // here guarantees the trail origin and weapon-tip math track the scaled
+    // image positions below.
+    const geom = computeWeaponGeometry(pose, profile, worldRefX, worldRefY, dir, scale);
+
+    const torsoOffY = anchors.torsoOffsetY
       + pose.crouchFactor * CROUCH_OFFSET_Y
       + (pose.headY || 0) * HEAD_BOB_FACTOR;
 
-    // Torso: pivots at the hip and extends upward.
-    const hipX = worldX;
-    const hipY = torsoY + HIP_FROM_TORSO_TOP;
+    // Torso pivots at the hip and extends upward.
+    const [hipX, hipY] = s(0, torsoOffY + HIP_FROM_TORSO_TOP);
     const torsoRot = (pose.torsoAngle || 0) * DEG2RAD * dir;
     this.#place('torso', hipX, hipY, torsoRot, scale);
 
     // Neck = top of rotated torso. Head rides the torso with a soft lag.
-    const neckX = hipX + Math.sin(torsoRot) * TORSO_LEN;
-    const neckY = hipY - Math.cos(torsoRot) * TORSO_LEN;
+    const neckX = hipX + Math.sin(torsoRot) * TORSO_LEN * scale;
+    const neckY = hipY - Math.cos(torsoRot) * TORSO_LEN * scale;
     this.#place('head', neckX, neckY, torsoRot * 0.3, scale);
 
-    // Front arm: shoulder -> hand, elbow at midpoint.
+    // Front arm: shoulder -> hand, elbow at midpoint. Geometry is already
+    // in world coordinates, pre-scaled.
     const frontArmRot = limbRotation(geom.handX - geom.armX, geom.handY - geom.armY);
     const elbowX = (geom.armX + geom.handX) / 2;
     const elbowY = (geom.armY + geom.handY) / 2;
@@ -180,12 +181,11 @@ export class AssetWarriorRenderer {
 
     // Back arm — attenuated swing; keeps the silhouette reading as a
     // two-armed fighter even without per-fighter shield art.
-    const backShoulderX = worldX - 12 * dir;
-    const backShoulderY = torsoY - 6;
     const backArmAngle = (-(pose.armAngle || 0) * 0.35) * DEG2RAD;
     const backReach = anchors.armReach * 0.85;
-    const backHandX = backShoulderX + Math.sin(backArmAngle) * backReach * dir;
-    const backHandY = backShoulderY - Math.cos(backArmAngle) * backReach;
+    const [backShoulderX, backShoulderY] = s(-12 * dir, torsoOffY - 6);
+    const backHandX = backShoulderX + Math.sin(backArmAngle) * backReach * dir * scale;
+    const backHandY = backShoulderY - Math.cos(backArmAngle) * backReach * scale;
     const backArmRot = limbRotation(backHandX - backShoulderX, backHandY - backShoulderY);
     this.#place('back_arm_upper', backShoulderX, backShoulderY, backArmRot, scale);
     this.#place('back_arm_lower', (backShoulderX + backHandX) / 2, (backShoulderY + backHandY) / 2, backArmRot, scale);
@@ -193,22 +193,19 @@ export class AssetWarriorRenderer {
     // Legs — hip to foot. Foot target positions match the vector draw
     // functions: front foot inside-of-stance, back foot outside.
     const legSpread = pose.legSpread || 0;
-    const floorY = baseY + profile.renderOffsetY - 5 + (pose.bodyY || 0);
-    const frontHipX = worldX - 5 * dir;
-    const backHipX = worldX + 3 * dir;
-    const hipLegY = torsoY + HIP_FROM_TORSO_TOP;
+    const [frontHipX, hipLegY] = s(-5 * dir, torsoOffY + HIP_FROM_TORSO_TOP);
+    const [backHipX] = s(3 * dir, 0);
+    const [frontFootX, floorY] = s(-legSpread * 0.6 * dir, -5);
 
-    const frontFootX = worldX - legSpread * 0.6 * dir;
     const frontLegRot = limbRotation(frontFootX - frontHipX, floorY - hipLegY);
     this.#place('front_leg_upper', frontHipX, hipLegY, frontLegRot, scale);
     this.#place('front_leg_lower', (frontHipX + frontFootX) / 2, (hipLegY + floorY) / 2, frontLegRot, scale);
 
-    const backFootX = worldX + legSpread * 0.4 * dir;
+    const [backFootX] = s(legSpread * 0.4 * dir, 0);
     const backLegRot = limbRotation(backFootX - backHipX, floorY - hipLegY);
     this.#place('back_leg_upper', backHipX, hipLegY, backLegRot, scale);
     this.#place('back_leg_lower', (backHipX + backFootX) / 2, (hipLegY + floorY) / 2, backLegRot, scale);
 
-    // Flip asymmetric parts horizontally when facing left.
     for (const img of Object.values(this.parts)) {
       img.setVisible(true);
       img.setFlipX(!facingRight);
@@ -250,7 +247,7 @@ export class AssetWarriorRenderer {
     if (alpha <= 0.01) return;
 
     const color = this.profile.fx.trailColor;
-    const width = (pose.trailWidth || this.profile.weaponWidth) * trail.widthScale;
+    const width = (pose.trailWidth ?? this.profile.weaponWidth) * trail.widthScale;
 
     if (trail.style === 'thrust' || trail.style === 'stock') {
       this.#drawThrustSmear(geom, dir, width, color, alpha, trail);

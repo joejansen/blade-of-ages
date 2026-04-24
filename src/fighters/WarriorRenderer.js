@@ -69,7 +69,7 @@ export class WarriorRenderer {
 
     const geom = computeWeaponGeometry(pose, this.profile, x, y, dir);
     const color = this.profile.fx.trailColor;
-    const width = (pose.trailWidth || this.profile.weaponWidth) * trail.widthScale;
+    const width = (pose.trailWidth ?? this.profile.weaponWidth) * trail.widthScale;
 
     this.trailGraphics.setPosition(this.graphics.x, this.graphics.y);
     this.trailGraphics.setScale(this.profile.renderScale);

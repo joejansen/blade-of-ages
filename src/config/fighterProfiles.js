@@ -1,9 +1,9 @@
 // Anchor defaults — kept in sync with each warrior's vector draw function
 // (see src/art/warriorArt.js). armOffsetX/Y/Reach locate the sword hand so
 // the weapon trail originates from the same point the blade is drawn from.
-// renderedWeaponLength is the on-screen length of the drawn weapon, which
-// the trail uses instead of the abstract profile weaponLength to avoid a
-// second "ghost" weapon extending past the actual sprite.
+// `trail.renderedWeaponLength` is the on-screen length of the drawn weapon,
+// which the trail uses directly so a short blade cannot be overshot by a
+// "ghost" smear extending past the actual sprite.
 const DEFAULT_ANCHORS = {
   armOffsetX: 10,
   armOffsetY: -6,
@@ -69,11 +69,8 @@ const DEFAULT_PROFILE = {
   },
   anchors: DEFAULT_ANCHORS,
   trail: DEFAULT_TRAIL,
-  // weaponLength/weaponWidth are abstract reach values used as fallbacks and
-  // for non-trail systems (e.g. attack hitboxes tuned per fighter). The
-  // authoritative on-screen weapon length for the trail is
-  // `trail.renderedWeaponLength`, which must match the draw function.
-  weaponLength: 62,
+  // Fallback trail stroke width when a keyframe does not set pose.trailWidth.
+  // The authoritative on-screen weapon length is `trail.renderedWeaponLength`.
   weaponWidth: 12,
 };
 
@@ -99,7 +96,6 @@ export const FIGHTER_PROFILES = {
     fx: { trailColor: 0xd9ecff, specialGlow: 0xffd700 },
     anchors: { armOffsetX: 12, armOffsetY: -8, armReach: 28 },
     trail: { style: 'slash', sweep: 0.55, lengthScale: 1, widthScale: 1.05, renderedWeaponLength: 55 },
-    weaponLength: 76,
     weaponWidth: 10,
   }),
   samurai: createProfile({
@@ -110,7 +106,6 @@ export const FIGHTER_PROFILES = {
     fx: { trailColor: 0xffe8ef, dustColor: 0xf1d7d7, specialGlow: 0xff6d6d },
     anchors: { armOffsetX: 10, armOffsetY: -6, armReach: 26 },
     trail: { style: 'slash', sweep: 0.42, lengthScale: 1, widthScale: 0.95, renderedWeaponLength: 50 },
-    weaponLength: 82,
     weaponWidth: 8,
   }),
   viking: createProfile({
@@ -121,7 +116,6 @@ export const FIGHTER_PROFILES = {
     fx: { trailColor: 0xbdefff, dustColor: 0xbcb7ac, specialGlow: 0x7ad7ff },
     anchors: { armOffsetX: 12, armOffsetY: -6, armReach: 26 },
     trail: { style: 'smash', sweep: 0.75, lengthScale: 1.1, widthScale: 1.2, renderedWeaponLength: 48 },
-    weaponLength: 74,
     weaponWidth: 14,
   }),
   gladiator: createProfile({
@@ -134,7 +128,6 @@ export const FIGHTER_PROFILES = {
     // so the trail must match those values to avoid a second ghost sword.
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 26 },
     trail: { style: 'tight', sweep: 0.2, lengthScale: 0.95, widthScale: 0.7, alphaScale: 0.75, renderedWeaponLength: 35 },
-    weaponLength: 60,
     weaponWidth: 13,
   }),
   mongol: createProfile({
@@ -145,7 +138,6 @@ export const FIGHTER_PROFILES = {
     fx: { trailColor: 0xffd7a0, dustColor: 0xdcc497, specialGlow: 0xffa640 },
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 24 },
     trail: { style: 'slash', sweep: 0.55, lengthScale: 1.05, widthScale: 1, renderedWeaponLength: 45 },
-    weaponLength: 70,
     weaponWidth: 10,
   }),
   spartan: createProfile({
@@ -156,7 +148,6 @@ export const FIGHTER_PROFILES = {
     fx: { trailColor: 0xfff2c2, dustColor: 0xd6bc8f, specialGlow: 0xffd700 },
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 26 },
     trail: { style: 'tight', sweep: 0.28, lengthScale: 0.95, widthScale: 0.85, alphaScale: 0.85, renderedWeaponLength: 35 },
-    weaponLength: 58,
     weaponWidth: 12,
   }),
   pirate: createProfile({
@@ -167,7 +158,6 @@ export const FIGHTER_PROFILES = {
     fx: { trailColor: 0xffe29f, dustColor: 0xc9b08f, specialGlow: 0xffd061 },
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 24 },
     trail: { style: 'slash', sweep: 0.5, lengthScale: 1, widthScale: 1, renderedWeaponLength: 40 },
-    weaponLength: 68,
     weaponWidth: 11,
   }),
   zulu: createProfile({
@@ -179,7 +169,6 @@ export const FIGHTER_PROFILES = {
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 26 },
     // Iklwa is a short stabbing spear: thrust-led motion with negligible lateral sweep.
     trail: { style: 'thrust', sweep: 0.12, lengthScale: 1.1, widthScale: 0.9, alphaScale: 0.9, renderedWeaponLength: 55 },
-    weaponLength: 76,
     weaponWidth: 9,
   }),
   conquistador: createProfile({
@@ -190,7 +179,6 @@ export const FIGHTER_PROFILES = {
     fx: { trailColor: 0xf6f6ff, dustColor: 0xd4c1a3, specialGlow: 0xffd88c },
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 24 },
     trail: { style: 'thrust', sweep: 0.18, lengthScale: 1.05, widthScale: 0.8, renderedWeaponLength: 52 },
-    weaponLength: 86,
     weaponWidth: 8,
   }),
   seal: createProfile({
@@ -204,7 +192,6 @@ export const FIGHTER_PROFILES = {
     // than a sword slash; sweep is narrow and the trail is anchored along the
     // weapon's forward axis.
     trail: { style: 'stock', sweep: 0.3, lengthScale: 0.85, widthScale: 1.1, alphaScale: 0.8, renderedWeaponLength: 55 },
-    weaponLength: 84,
     weaponWidth: 10,
   }),
 };
