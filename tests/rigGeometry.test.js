@@ -100,3 +100,20 @@ test('walking preserves animated leg spread for the missing-sprite vector fallba
     assert.ok(Math.max(...spread) - Math.min(...spread) > 10, 'vector feet must move throughout the walking clip');
   }
 });
+
+test('rear elbow stays tucked behind the guard hand and below it in torso space', () => {
+  for (const profile of Object.values(FIGHTER_PROFILES)) {
+    for (const state of states) for (let t = 0; t <= 1800; t += 50) for (const dir of [-1, 1]) {
+      const pose = sampleAnimationPose(state, t, profile);
+      const rig = computeRigGeometry(pose, profile, 200, 580, dir, profile.renderScale);
+      const lean = pose.torsoAngle * Math.PI / 180;
+      const local = p => {
+        const dx = (p.x - rig.hip.x) * dir, dy = p.y - rig.hip.y;
+        return { x: dx * Math.cos(lean) + dy * Math.sin(lean), y: -dx * Math.sin(lean) + dy * Math.cos(lean) };
+      };
+      const elbow = local(rig.backArm.joint), hand = local(rig.backArm.end);
+      assert.ok(elbow.x < hand.x, `${state}: rear elbow must stay behind its hand`);
+      assert.ok(elbow.y > hand.y, `${state}: rear elbow must hang below its guard hand`);
+    }
+  }
+});
