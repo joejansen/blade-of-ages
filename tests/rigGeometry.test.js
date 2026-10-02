@@ -27,6 +27,8 @@ for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) {
       }
       near(rig.frontLeg.end.y, 580 + (-RIG.sole + pose.frontFootY) * scale, `${state} front foot planted`);
       near(rig.backLeg.end.y, 580 + (-RIG.sole + pose.backFootY) * scale, `${state} back foot planted`);
+      near(rig.weapon.tipX + mirror.weapon.tipX, 400, 'mirrored tip x');
+      near(rig.weapon.tipY, mirror.weapon.tipY, 'mirrored tip y');
       near(rig.weapon.handX, rig.frontArm.end.x, 'grip at hand');
       near(rig.weapon.handY, rig.frontArm.end.y, 'grip at hand');
       near(Math.hypot(rig.weapon.tipX - rig.weapon.handX, rig.weapon.tipY - rig.weapon.handY), profile.trail.renderedWeaponLength * scale, 'physical weapon length');
@@ -70,6 +72,8 @@ test('gait alternates lifted feet and blends back to planted idle', () => {
   assert.ok(b.backFootY < 0 && Math.abs(b.frontFootY) < 1e-7);
   const idle = sampleAnimationPose('idle', 0, profile);
   near(blendPose(a, idle, 1).frontFootY, 0, 'idle plants foot');
+  near(blendPose(a, idle, 1).walkBlend, 0, 'idle restores clip stance');
+  near(blendPose(a, idle, 0.5).walkBlend, 0.5, 'gait stance blends on transition');
 });
 
 test('unreachable and coincident IK targets stay finite with rigid bones', () => {
@@ -86,5 +90,13 @@ test('victory raises the weapon above the shoulder with its tip upward', () => {
     const { weapon } = computeRigGeometry(pose, profile, 0, 0, 1);
     assert.ok(weapon.handY < weapon.armY - 15);
     assert.ok(weapon.tipY < weapon.handY);
+  }
+});
+
+test('walking preserves animated leg spread for the missing-sprite vector fallback', () => {
+  for (const profile of Object.values(FIGHTER_PROFILES)) {
+    const poses = [0, 0.2, 0.5, 0.7].map(t => sampleAnimationPose('walking', t * 900 / profile.clipSpeed.walk, profile));
+    const spread = poses.map(p => p.legSpread);
+    assert.ok(Math.max(...spread) - Math.min(...spread) > 10, 'vector feet must move throughout the walking clip');
   }
 });

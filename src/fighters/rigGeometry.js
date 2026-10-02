@@ -24,7 +24,11 @@ export function computeRigGeometry(pose, profile, x, baseY, dir, scale = 1) {
   const crouch = clamp(pose.crouchFactor || 0, 0, 1);
   const lean = (pose.torsoAngle || 0) * RAD;
   const hip = { x: 0, y: -55 + crouch * 23 + (pose.bodyY || 0) * 0.45 + (pose.headY || 0) * 0.06 };
-  const spread = clamp(pose.legSpread || 14, 8, 38);
+  // The sprite gait has its own stance width; retain animated legSpread in
+  // the pose for the vector fallback, which does not consume foot targets.
+  const walkBlend = clamp(pose.walkBlend || 0, 0, 1);
+  const clipSpread = pose.legSpread || 14;
+  const spread = clamp(clipSpread + (16 * profile.motion.walkStride - clipSpread) * walkBlend, 8, 38);
   const frontTarget = { x: spread * 0.9 + (pose.frontFootX || 0), y: -RIG.sole + (pose.frontFootY || 0) };
   const backTarget = { x: -spread * 0.8 + (pose.backFootX || 0), y: -RIG.sole + (pose.backFootY || 0) };
   // Lower the pelvis when a wide stance needs it, so the solver never pulls a

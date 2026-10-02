@@ -1,4 +1,5 @@
 const DEFAULT_POSE = {
+  walkBlend: 0,
   handLift: 0,
   frontFootX: 0,
   frontFootY: 0,
@@ -209,7 +210,7 @@ function applyProfile(pose, profile, state, context, progress) {
     result.backFootX = -result.frontFootX;
     result.frontFootY = -Math.max(0, Math.cos(progress * Math.PI * 2)) * 7;
     result.backFootY = -Math.max(0, -Math.cos(progress * Math.PI * 2)) * 7;
-    result.legSpread = 16;
+    result.walkBlend = 1;
     result.bodyY *= motion.walkBounce;
     result.legSpread *= motion.walkStride;
     result.weaponAngle += (context.facingRight ? 1 : -1) * motion.walkStride * 2;
