@@ -58,3 +58,13 @@ At least one fighter from each family must pass the full row above:
   release cycle.
 - Build runs in both `npm run dev` (preview) and `npm run build` without
   warnings or runtime errors.
+
+## Rig regression checks
+
+Run `npm test` to sample every clip for all ten warriors at fight and showcase
+scales. This checks fixed bone lengths, connected hands/grips, mirrored source
+landmarks, reachable planted feet, and gait lift. Then run `npm run build`.
+Visually inspect both facings, especially open headgear (Pirate, Zulu,
+Conquistador, Mongol), axe orientation (Viking), and the shin/boot overlap.
+The sprite renderer's solved geometry supplies the F1 hand and tip markers;
+vector fallback continues to use its original anchors.
