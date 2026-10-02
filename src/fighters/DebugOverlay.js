@@ -34,15 +34,11 @@ export class DebugOverlay {
     const profile = fighter.profile;
     const dir = fighter.facingRight ? 1 : -1;
 
-    // Pass renderScale and include bodyY so the overlay tracks the actual
-    // drawn hand/tip for both renderer modes. AssetWarriorRenderer places
-    // parts at `sprite.y + renderOffsetY + bodyY` scaled by renderScale,
-    // and WarriorRenderer produces the same effective world positions via
-    // its graphics.setPosition + setScale. Matching both here means the
-    // debug markers stay locked to the blade in either renderer.
+    // Use the production sprite rig's solved joints. The vector fallback
+    // retains its original drawing geometry.
     const worldX = fighter.sprite.x + profile.renderOffsetX;
     const worldY = fighter.sprite.y + profile.renderOffsetY + (pose.bodyY || 0);
-    const { armX, armY, handX, handY, tipX, tipY } = computeWeaponGeometry(
+    const { armX, armY, handX, handY, tipX, tipY } = fighter.renderer.geometry?.weapon || computeWeaponGeometry(
       pose, profile, worldX, worldY, dir, profile.renderScale,
     );
 

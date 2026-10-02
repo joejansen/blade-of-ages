@@ -1,4 +1,9 @@
 const DEFAULT_POSE = {
+  handLift: 0,
+  frontFootX: 0,
+  frontFootY: 0,
+  backFootX: 0,
+  backFootY: 0,
   headY: 0,
   torsoAngle: 0,
   armAngle: 12,
@@ -120,10 +125,10 @@ const CLIPS = {
     loop: true,
     duration: 1700,
     keyframes: [
-      { t: 0, values: { headY: -4, torsoAngle: -8, armAngle: -122, weaponAngle: -136, legSpread: 16, bodyY: 0, glow: 0.1 } },
-      { t: 0.3, values: { headY: -11, torsoAngle: -2, armAngle: -142, weaponAngle: -150, legSpread: 20, bodyY: -8, glow: 0.45 } },
-      { t: 0.6, values: { headY: -8, torsoAngle: 4, armAngle: -112, weaponAngle: -118, legSpread: 22, bodyY: 2, glow: 0.25 } },
-      { t: 1, values: { headY: -4, torsoAngle: -8, armAngle: -122, weaponAngle: -136, legSpread: 16, bodyY: 0, glow: 0.1 } },
+      { t: 0, values: { headY: -4, torsoAngle: -8, armAngle: -20, handLift: 30, weaponAngle: -18, legSpread: 16, bodyY: 0, glow: 0.1 } },
+      { t: 0.3, values: { headY: -11, torsoAngle: -2, armAngle: -12, handLift: 42, weaponAngle: -8, legSpread: 20, bodyY: -8, glow: 0.45 } },
+      { t: 0.6, values: { headY: -8, torsoAngle: 4, armAngle: 8, handLift: 32, weaponAngle: 12, legSpread: 22, bodyY: 2, glow: 0.25 } },
+      { t: 1, values: { headY: -4, torsoAngle: -8, armAngle: -20, handLift: 30, weaponAngle: -18, legSpread: 16, bodyY: 0, glow: 0.1 } },
     ],
   },
 };
@@ -180,7 +185,7 @@ function sampleKeyframes(clip, progress) {
   return { ...DEFAULT_POSE, ...(frames[frames.length - 1]?.values || {}) };
 }
 
-function applyProfile(pose, profile, state, context) {
+function applyProfile(pose, profile, state, context, progress) {
   const result = { ...pose };
   const bias = profile.poseBias;
   const motion = profile.motion;
@@ -199,6 +204,12 @@ function applyProfile(pose, profile, state, context) {
   }
 
   if (state === 'walking') {
+    const stride = Math.sin(progress * Math.PI * 2);
+    result.frontFootX = stride * 12 * motion.walkStride;
+    result.backFootX = -result.frontFootX;
+    result.frontFootY = -Math.max(0, Math.cos(progress * Math.PI * 2)) * 7;
+    result.backFootY = -Math.max(0, -Math.cos(progress * Math.PI * 2)) * 7;
+    result.legSpread = 16;
     result.bodyY *= motion.walkBounce;
     result.legSpread *= motion.walkStride;
     result.weaponAngle += (context.facingRight ? 1 : -1) * motion.walkStride * 2;
@@ -209,6 +220,8 @@ function applyProfile(pose, profile, state, context) {
   }
 
   if (state === 'jumping') {
+    result.frontFootY = -10 * motion.airTuck;
+    result.backFootY = -16 * motion.airTuck;
     result.legSpread *= motion.airTuck;
     result.bodyY += Math.min(0, context.verticalVelocity / 120);
   }
@@ -238,7 +251,7 @@ export function sampleAnimationPose(state, elapsedMs, profile, context = {}) {
   }
 
   const pose = sampleKeyframes(clip, progress);
-  return applyProfile(pose, profile, state, context);
+  return applyProfile(pose, profile, state, context, progress);
 }
 
 export function blendPose(currentPose, targetPose, alpha) {

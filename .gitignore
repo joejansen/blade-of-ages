@@ -6,3 +6,7 @@ dist
 .playwright-mcp/
 *.png
 !public/**/*.png
+
+# Local browser verification artifacts
+.playwright-cli/
+output/playwright/

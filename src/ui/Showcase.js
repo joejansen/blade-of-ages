@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { AssetWarriorRenderer, FOOT_DROP } from '../fighters/AssetWarriorRenderer.js';
+import { AssetWarriorRenderer } from '../fighters/AssetWarriorRenderer.js';
 import { sampleAnimationPose, blendPose } from '../fighters/animationClips.js';
 import { getFighterProfile } from '../config/fighterProfiles.js';
 
@@ -14,9 +14,7 @@ export class Showcase {
     this.flourish = opts.flourish ?? true;
     this.profile = getFighterProfile(warriorConfig.id);
     const scale = opts.scale ?? 3.2;
-    // groundY is where the soles should visibly land; lift the rig's
-    // baseline by the leg overhang so they do.
-    this.groundY = groundY - FOOT_DROP * this.profile.renderScale * scale;
+    this.groundY = groundY;
     this.renderer = new AssetWarriorRenderer(scene, warriorConfig, {
       displayScale: scale,
       depth: opts.depth ?? 12,

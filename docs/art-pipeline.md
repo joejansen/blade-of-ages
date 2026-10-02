@@ -83,25 +83,39 @@ still match the draw function.
 
 ### Asset-driven sprite renderer (default)
 
-`src/fighters/AssetWarriorRenderer.js` is the production renderer. It consumes
-the PNG parts produced by the art pipeline and drives them with the same
-pose anchors as `WarriorRenderer`, so:
+`src/fighters/AssetWarriorRenderer.js` is the production renderer. Its anatomy
+is solved in `src/fighters/rigGeometry.js`; the legacy vector renderer retains
+its own profile anchors and automatically takes over when a PNG is missing.
 
-- The sprite hand coincides with the weapon-trail origin (`computeWeaponGeometry`
-  is shared between the two renderers).
-- `anchors.armOffsetX/Y/Reach` and `trail.renderedWeaponLength` in each
-  fighter's profile still govern where the blade tip lands, so trail tuning
-  carries over automatically when you re-generate art.
+Production sprite calibration lives in `src/config/assetRig.js`:
 
-Each PNG part must follow the orientation contract the renderer assumes:
+- Each part has normalized source-image `start` and `end` attachment points.
+  Scale comes from joint distance, not the full image height. Skirts, hands,
+  boot toes, plumes and transparent space do not define bone length.
+- The torso drives the neck and both shoulders. Fixed-length two-bone arms
+  and legs bend at elbows and knees. A wide stance lowers the pelvis enough
+  to keep foot targets reachable. Breathing moves the body over planted feet;
+  the walk cycle alternates foot travel and lift, and jump poses tuck the legs.
+- Boot crops share the shin texture but remain level at the ankle. Overlap
+  at the ankle keeps the foot joined while the shin bends.
+- Weapon `start` is the actual grip and `end` is the cutting/barrel end.
+  The axe's grip is below its head; the shipped swords point downward in
+  their source files. The runtime derives orientation from those landmarks,
+  including when the fighter faces left.
+- Headgear is seated at the neck or brow using its own origin and size.
+  Open hats/helmets receive a small drawn face and neck underneath because
+  the corresponding PNGs contain headgear only. `cropTop` hides assembly tabs.
 
-- `torso.png` — hip at bottom, neck at top.
-- `head.png` — chin at bottom, crown at top.
-- `upper_arm.png` / `lower_arm.png` / `upper_leg.png` / `lower_leg.png` —
-  joint ring at top, limb extending downward at rest.
-- `weapon.png` — grip at top, blade/barrel extending downward at rest.
+Coordinates use the entire original image and survive BootScene resampling.
+When replacing an asset, inspect its actual joints and recalibrate that part;
+do not assume the generator followed the requested orientation. Regeneration
+should still aim for coherent full-character art as described above.
 
-If a generated asset breaks that contract, fix the prompt or flip the asset
-at generation time rather than piling per-fighter rotation offsets onto the
-renderer. The vector `WarriorRenderer` remains the automatic fallback when a
-PNG is missing, so development builds without assets still render.
+Sprite trails and the F1 debug markers consume the solved weapon geometry.
+`trail.renderedWeaponLength` sets physical grip-to-tip length; smear intensity
+and trail keyframes never stretch that length. Combat hitboxes, damage, reach,
+and attack timing are unchanged by sprite calibration.
+
+Run `npm test` for the full-roster joint, mirror, gait and source-landmark
+regressions, then `npm run build`. Inspect the real title, character selection
+and fight scenes as well; numerical landmarks cannot judge costume seams.
