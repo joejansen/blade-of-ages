@@ -1,7 +1,7 @@
 // Pure anatomy/attachment math shared by sprites, trails, tests and debugging.
 const RAD = Math.PI / 180;
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
-export const RIG = { torso: 40, upperArm: 21, forearm: 22, thigh: 27, shin: 27, sole: 5 };
+export const RIG = { torso: 34, upperArm: 21, forearm: 22, thigh: 27, shin: 27, sole: 5 };
 
 // Fixed-length two-bone chain. Unreachable targets are clamped, never stretched.
 export function solveLimb(root, target, a, b, bend = 1) {
@@ -39,13 +39,17 @@ export function computeRigGeometry(pose, profile, x, baseY, dir, scale = 1) {
   }
   const torsoPoint = (dx, dy) => ({ x: hip.x + dx * Math.cos(lean) - dy * Math.sin(lean), y: hip.y + dx * Math.sin(lean) + dy * Math.cos(lean) });
   const neck = torsoPoint(0, -RIG.torso);
-  const frontShoulder = torsoPoint(-9, -32);
-  const backShoulder = torsoPoint(7, -32);
+  // Keep shoulder sockets on the resized torso rather than at the old width.
+  const frontShoulder = torsoPoint(-0.225 * RIG.torso, -0.8 * RIG.torso);
+  const backShoulder = torsoPoint(0.175 * RIG.torso, -0.8 * RIG.torso);
   const armAngle = (pose.armAngle || 0) * RAD;
   // Guard at chest height. Wind-up and follow-through extend from this guard.
   const handTarget = { x: frontShoulder.x + 25 + Math.sin(armAngle) * 15, y: frontShoulder.y + 13 - Math.cos(armAngle) * 12 - (pose.handLift || 0) };
   const frontArm = solveLimb(frontShoulder, handTarget, RIG.upperArm, RIG.forearm, 1);
-  const backArm = solveLimb(backShoulder, torsoPoint(15 - Math.sin(armAngle) * 4, -9), RIG.upperArm, RIG.forearm, -1);
+  // Rear hand guards the lower chest; the elbow hangs behind and below it,
+  // using the same anatomical bend direction as the weapon arm.
+  const backHandTarget = torsoPoint((0.375 - Math.sin(armAngle) * 0.1) * RIG.torso, -0.55 * RIG.torso);
+  const backArm = solveLimb(backShoulder, backHandTarget, RIG.upperArm, RIG.forearm, 1);
   const frontLeg = solveLimb({ x: hip.x - 5, y: hip.y }, frontTarget, RIG.thigh, RIG.shin, -1);
   const backLeg = solveLimb({ x: hip.x + 5, y: hip.y }, backTarget, RIG.thigh, RIG.shin, -1);
   const world = p => ({ x: x + p.x * dir * scale, y: baseY + p.y * scale });
