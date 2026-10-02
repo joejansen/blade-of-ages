@@ -1,6 +1,31 @@
 import Phaser from 'phaser';
 import { SoundManager } from '../audio/SoundManager.js';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/constants.js';
+import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
+import { WARRIORS } from '../config/warriors.js';
+import {
+  PALETTE, HEX, displayText, bodyText, Backdrop, addHeader, skewPoints,
+  transitionTo, fadeIn, addKeyHint,
+} from '../ui/theme.js';
+import { Showcase } from '../ui/Showcase.js';
+
+const PANEL_W = 400;
+const PANEL_H = 430;
+const PANEL_Y = 400;
+
+const MODES = [
+  {
+    id: '1p',
+    numeral: 'I',
+    title: 'SINGLE WARRIOR',
+    body: 'Stand alone against an opponent\nwho fights in the manner of their age.',
+  },
+  {
+    id: '2p',
+    numeral: 'II',
+    title: 'DUAL WARRIORS',
+    body: 'Two blades, one keyboard.\nSettle it in person.',
+  },
+];
 
 export class ModeSelectScene extends Phaser.Scene {
   constructor() {
@@ -8,154 +33,121 @@ export class ModeSelectScene extends Phaser.Scene {
   }
 
   create() {
-    // Dynamic Dark Background
-    const bgArena = 'arena_longship'; // Just a cool background
-    const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, bgArena);
-    bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
-    bg.setTint(0x444444);
-
-    // Header Background
-    this.add.rectangle(GAME_WIDTH / 2, 85, GAME_WIDTH, 80, 0x000000, 0.6);
-
-    // Border
-    const border = this.add.graphics();
-    border.lineStyle(4, 0x000000, 0.8);
-    border.strokeRect(30, 30, GAME_WIDTH - 60, GAME_HEIGHT - 60);
-
-    // Header
-    this.add.text(GAME_WIDTH / 2, 85, 'CHOOSE YOUR PATH', {
-      fontSize: '48px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 8,
-    }).setOrigin(0.5);
-
-    // 1 Player button
-    this.createModeButton(
-      GAME_WIDTH / 2 - 180, 320,
-      'Single Warrior',
-      'Battle against AI opponents\nwith unique fighting styles',
-      '1p'
-    );
-
-    // 2 Player button
-    this.createModeButton(
-      GAME_WIDTH / 2 + 180, 320,
-      'Dual Warriors',
-      'Local 2-player combat\non the same keyboard',
-      '2p'
-    );
-
-    // VS emblem in center
-    this.add.text(GAME_WIDTH / 2, 310, 'VS', {
-      fontSize: '42px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffcc00',
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
-
-    // Sword icons flanking VS
-    const swords = this.add.graphics();
-    swords.lineStyle(2, COLORS.inkBrown, 0.5);
-    // Left sword
-    swords.beginPath();
-    swords.moveTo(GAME_WIDTH / 2 - 50, 300);
-    swords.lineTo(GAME_WIDTH / 2 - 30, 320);
-    swords.stroke();
-    // Right sword
-    swords.beginPath();
-    swords.moveTo(GAME_WIDTH / 2 + 50, 300);
-    swords.lineTo(GAME_WIDTH / 2 + 30, 320);
-    swords.stroke();
-
-    // Back hint
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 60, 'ESC TO RETURN', {
-      fontSize: '18px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5);
-
-    this.input.keyboard.on('keydown-ESC', () => {
-      this.scene.start('Title');
+    fadeIn(this);
+    new Backdrop(this, 'longship', {
+      grade: { saturation: -0.85, brightness: 0.42, contrast: 0.2, tint: [0.88, 0.95, 1.05] },
+      emberColor: PALETTE.p1,
     });
+    addHeader(this, 'THE FIRST CHOICE', 'CHOOSE YOUR PATH');
+
+    const roster = Phaser.Utils.Array.Shuffle([...WARRIORS]);
+    this.panels = MODES.map((mode, i) => {
+      const x = GAME_WIDTH / 2 + (i === 0 ? -230 : 230);
+      return this.createPanel(x, mode, i, roster);
+    });
+
+    this.index = 0;
+    this.focus(0, true);
+
+    ['LEFT', 'A'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.focus(0)));
+    ['RIGHT', 'D'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.focus(1)));
+    ['ENTER', 'SPACE'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.choose(this.index)));
+    this.input.keyboard.on('keydown-ESC', () => transitionTo(this, 'Title'));
+
+    addKeyHint(this, '← →  CHOOSE     ENTER  CONFIRM     ESC  BACK');
   }
 
-  createModeButton(x, y, title, description, mode) {
-    const w = 280;
-    const h = 240;
+  createPanel(x, mode, index, roster) {
+    const container = this.add.container(x, PANEL_Y).setDepth(10);
+    const frame = this.add.graphics();
+    container.add(frame);
 
-    // Card background
-    const card = this.add.rectangle(x, y, w, h, 0x111111, 0.85)
-      .setStrokeStyle(4, 0x000000)
+    const numeral = this.add.text(0, -96, mode.numeral, displayText(200, {
+      weight: '900', color: HEX.bone, spacing: 0, shadow: false,
+    })).setOrigin(0.5).setAlpha(0.06);
+    container.add(numeral);
+
+    const title = this.add.text(0, 116, mode.title, displayText(26, { weight: '900', spacing: 6 }))
+      .setOrigin(0.5);
+    const body = this.add.text(0, 166, mode.body, bodyText(19, { italic: true, color: HEX.ash }))
+      .setOrigin(0.5);
+    container.add([title, body]);
+
+    const hit = this.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x000000, 0.001)
       .setInteractive({ useHandCursor: true });
+    container.add(hit);
+    hit.on('pointerover', () => this.focus(index));
+    hit.on('pointerdown', () => this.choose(index));
 
-    // Player icon
-    const icon = this.add.graphics();
-    icon.fillStyle(COLORS.gold, 1);
-    if (mode === '1p') {
-      // Single figure
-      icon.fillCircle(x, y - 60, 15);
-      icon.fillRect(x - 8, y - 45, 16, 30);
-      // Sword
-      icon.lineStyle(3, 0x888888, 1);
-      icon.beginPath();
-      icon.moveTo(x + 12, y - 40);
-      icon.lineTo(x + 30, y - 60);
-      icon.stroke();
-    } else {
-      // Two figures
-      icon.fillCircle(x - 20, y - 60, 12);
-      icon.fillRect(x - 28, y - 48, 14, 24);
-      icon.fillCircle(x + 20, y - 60, 12);
-      icon.fillRect(x + 14, y - 48, 14, 24);
-      // Crossed swords
-      icon.lineStyle(3, 0x888888, 1);
-      icon.beginPath();
-      icon.moveTo(x - 8, y - 44);
-      icon.lineTo(x + 8, y - 64);
-      icon.stroke();
-      icon.beginPath();
-      icon.moveTo(x + 8, y - 44);
-      icon.lineTo(x - 8, y - 64);
-      icon.stroke();
+    // Fighters stand inside the panel: one for solo, a pair for versus.
+    const groundY = PANEL_Y + 60;
+    const showcases = mode.id === '1p'
+      ? [new Showcase(this, roster[0], x, groundY, { scale: 2.3, depth: 12 })]
+      : [
+        new Showcase(this, roster[1], x - 70, groundY, { scale: 2.1, depth: 12 }),
+        new Showcase(this, roster[2], x + 70, groundY, { scale: 2.1, depth: 12, facingRight: false }),
+      ];
+
+    container.setAlpha(0);
+    this.tweens.add({
+      targets: container, alpha: 1, duration: 500, delay: 200 + index * 120,
+    });
+    this.tweens.add({
+      targets: container, y: { from: PANEL_Y + 30, to: PANEL_Y }, duration: 600, delay: 200 + index * 120, ease: 'Cubic.easeOut',
+    });
+
+    return { container, frame, title, body, numeral, showcases, focus: 0, mode };
+  }
+
+  drawPanel(panel) {
+    const { frame, focus } = panel;
+    const pts = skewPoints(PANEL_W, PANEL_H, 22);
+    frame.clear();
+    frame.fillStyle(PALETTE.ink, 0.72);
+    frame.fillPoints(pts, true);
+    // Crimson wash climbs from the base when focused.
+    if (focus > 0.01) {
+      const h = PANEL_H * 0.55 * focus;
+      frame.fillGradientStyle(PALETTE.crimson, PALETTE.crimson, PALETTE.crimson, PALETTE.crimson, 0, 0, 0.55, 0.55);
+      const skewAt = (y) => 22 * (-(y) / (PANEL_H / 2));
+      const yTop = PANEL_H / 2 - h;
+      frame.fillPoints([
+        { x: -PANEL_W / 2 + skewAt(yTop), y: yTop },
+        { x: PANEL_W / 2 + skewAt(yTop), y: yTop },
+        pts[2], pts[3],
+      ], true);
     }
+    frame.lineStyle(1, PALETTE.gold, 0.25 + focus * 0.65);
+    frame.strokePoints(pts, true);
+    frame.lineStyle(3, PALETTE.crimsonBright, focus);
+    frame.lineBetween(pts[3].x, pts[3].y, pts[2].x, pts[2].y);
+  }
 
-    // Title
-    const titleText = this.add.text(x, y + 20, title.toUpperCase(), {
-      fontSize: '26px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
+  focus(index, silent = false) {
+    if (index !== this.index && !silent) SoundManager.playUIHover(this);
+    this.index = index;
+    this.panels.forEach((panel, i) => {
+      const on = i === index;
+      this.tweens.add({
+        targets: panel,
+        focus: on ? 1 : 0,
+        duration: 220,
+        ease: 'Cubic.easeOut',
+        onUpdate: () => this.drawPanel(panel),
+      });
+      this.tweens.add({ targets: panel.container, scale: on ? 1.03 : 0.97, duration: 220, ease: 'Cubic.easeOut' });
+      this.tweens.add({ targets: panel.numeral, alpha: on ? 0.12 : 0.04, duration: 220 });
+      panel.title.setColor(on ? HEX.bone : HEX.ash);
+      panel.showcases.forEach(s => s.renderer?.setAlpha(on ? 1 : 0.5));
+    });
+    this.panels.forEach(p => this.drawPanel(p));
+  }
 
-    // Description
-    this.add.text(x, y + 70, description, {
-      fontSize: '14px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'italic',
-      color: '#cccccc',
-      align: 'center',
-    }).setOrigin(0.5);
-
-    // Hover effects
-    card.on('pointerover', () => {
-      card.setFillStyle(0x333333, 0.95);
-      card.setStrokeStyle(4, COLORS.gold);
-      titleText.setScale(1.05);
-    });
-    card.on('pointerout', () => {
-      card.setFillStyle(0x111111, 0.85);
-      card.setStrokeStyle(4, 0x000000);
-      titleText.setScale(1);
-    });
-    card.on('pointerdown', () => {
-      SoundManager.playUIClick(this);
-      this.scene.start('CharacterSelect', { mode });
-    });
+  choose(index) {
+    SoundManager.playUIClick(this);
+    const panel = this.panels[index];
+    panel.showcases.forEach(s => s.play('heavyAttack', 500));
+    this.cameras.main.shake(120, 0.004);
+    this.time.delayedCall(220, () => transitionTo(this, 'CharacterSelect', { mode: panel.mode.id }));
   }
 }

@@ -1,6 +1,17 @@
 import Phaser from 'phaser';
-import { SoundManager } from '../audio/SoundManager.js';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/constants.js';
+import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
+import { getWarriorById } from '../config/warriors.js';
+import {
+  PALETTE, HEX, PLAYER_COLORS, PLAYER_HEX, displayText, bodyText, Backdrop, drawRule,
+  createTextButton, bindMenuKeys, transitionTo, fadeIn, addKeyHint,
+} from '../ui/theme.js';
+import { Showcase } from '../ui/Showcase.js';
+
+const STAT_ROWS = [
+  { label: 'HITS LANDED', key: 'hitsLanded' },
+  { label: 'DAMAGE DEALT', key: 'damageDealt' },
+  { label: 'SPECIALS UNLEASHED', key: 'specialsUsed' },
+];
 
 export class ResultScene extends Phaser.Scene {
   constructor() {
@@ -12,205 +23,126 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create() {
-    const { winner, winnerName, roundWins, stats, matchData } = this.resultData;
+    fadeIn(this, 500);
+    const { winner, roundWins, stats, matchData } = this.resultData;
+    const warriors = [getWarriorById(matchData.warrior1Id), getWarriorById(matchData.warrior2Id)];
+    const champion = warriors[winner];
 
-    // Dynamic Background
-    const bgArena = matchData.arenaId || 'castle';
-    const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, `arena_${bgArena}`);
-    bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
-    bg.setTint(0x444444);
+    new Backdrop(this, matchData.arenaId || 'castle', {
+      grade: { saturation: -0.9, brightness: 0.4, contrast: 0.25 },
+      emberColor: PLAYER_COLORS[winner],
+    });
 
-    // Overlay to make text readable
-    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7);
+    // The champion, posed.
+    const showX = 300;
+    const groundY = GAME_HEIGHT - 70;
+    const pool = this.add.image(showX, groundY, 'fx_soft').setDepth(5)
+      .setScale(8, 1.8).setTint(PLAYER_COLORS[winner]).setAlpha(0.35).setBlendMode(Phaser.BlendModes.ADD);
+    const halo = this.add.image(showX, groundY - 200, 'fx_soft').setDepth(4)
+      .setScale(7, 10).setTint(PALETTE.gold).setAlpha(0.1).setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({ targets: [pool, halo], alpha: '*=0.6', duration: 2000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    new Showcase(this, champion, showX, groundY, {
+      scale: 3.6, state: 'victory', flourish: false, specialRatio: 1,
+    });
 
-    // Border with gold accent
-    const border = this.add.graphics();
-    border.lineStyle(4, COLORS.gold, 0.8);
-    border.strokeRect(30, 30, GAME_WIDTH - 60, GAME_HEIGHT - 60);
+    // Typography column.
+    const col = 820;
+    const kicker = this.add.text(col, 92, winner === 0 ? 'PLAYER ONE  ·  VICTORY' : (matchData.mode === '1p' ? 'THE OPPONENT  ·  VICTORY' : 'PLAYER TWO  ·  VICTORY'), displayText(14, {
+      color: PLAYER_HEX[winner], weight: '700', spacing: 8,
+    })).setOrigin(0.5);
+    const name = this.add.text(col, 140, champion.name.toUpperCase(), displayText(54, {
+      weight: '900', spacing: 10, shadowBlur: 20,
+    })).setOrigin(0.5);
+    const epithet = this.add.text(col, 190, `${champion.era}  ·  ${champion.weapon}`, bodyText(20, {
+      italic: true, color: HEX.ash,
+    })).setOrigin(0.5);
 
-    // Victory banner
-    const bannerY = 100;
+    // Score: roman numerals in player colours either side of a diamond.
+    const score = this.add.container(col, 252);
+    const s1 = this.add.text(-46, 0, String(roundWins[0]), displayText(60, { weight: '900', color: PLAYER_HEX[0], spacing: 0 })).setOrigin(0.5);
+    const s2 = this.add.text(46, 0, String(roundWins[1]), displayText(60, { weight: '900', color: PLAYER_HEX[1], spacing: 0 })).setOrigin(0.5);
+    const dia = this.add.graphics();
+    dia.fillStyle(PALETTE.gold, 1);
+    dia.fillPoints([{ x: 0, y: -8 }, { x: 8, y: 0 }, { x: 0, y: 8 }, { x: -8, y: 0 }], true);
+    score.add([s1, dia, s2]);
 
-    // Winner name
-    this.add.text(GAME_WIDTH / 2, bannerY, `${winnerName.toUpperCase()} VICTORIOUS!`, {
-      fontSize: '42px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffcc00',
-      stroke: '#000000',
-      strokeThickness: 6,
-    }).setOrigin(0.5);
+    const rule = this.add.graphics();
+    drawRule(rule, col, 306, 230);
 
-    // Score display
-    this.add.text(GAME_WIDTH / 2, 170, `${roundWins[0]} — ${roundWins[1]}`, {
-      fontSize: '64px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 8,
-    }).setOrigin(0.5);
+    const headerItems = [kicker, name, epithet, score, rule];
+    headerItems.forEach((o, i) => {
+      o.setAlpha(0).setDepth(30);
+      this.tweens.add({ targets: o, alpha: 1, duration: 500, delay: 200 + i * 90 });
+    });
+    this.tweens.add({ targets: name, scale: { from: 1.15, to: 1 }, duration: 600, delay: 290, ease: 'Expo.easeOut' });
 
-    // Divider
-    const div = this.add.graphics();
-    div.lineStyle(2, 0x888888, 0.5);
-    div.beginPath();
-    div.moveTo(GAME_WIDTH / 2 - 200, 210);
-    div.lineTo(GAME_WIDTH / 2 + 200, 210);
-    div.stroke();
+    // Stats: a single split bar per row, P1 from the left, P2 from the right.
+    const statG = this.add.graphics().setDepth(30);
+    const barW = 380;
+    STAT_ROWS.forEach((row, i) => {
+      const y = 362 + i * 58;
+      const v1 = Math.round(stats[0][row.key]);
+      const v2 = Math.round(stats[1][row.key]);
+      const label = this.add.text(col, y - 16, row.label, displayText(11, {
+        color: HEX.ash, weight: '700', spacing: 5, shadow: false,
+      })).setOrigin(0.5).setDepth(30);
+      const t1 = this.add.text(col - barW / 2 - 18, y + 6, String(v1), displayText(22, { weight: '900', spacing: 1, color: v1 >= v2 ? HEX.bone : HEX.ash })).setOrigin(1, 0.5).setDepth(30);
+      const t2 = this.add.text(col + barW / 2 + 18, y + 6, String(v2), displayText(22, { weight: '900', spacing: 1, color: v2 >= v1 ? HEX.bone : HEX.ash })).setOrigin(0, 0.5).setDepth(30);
+      [label, t1, t2].forEach(o => {
+        o.setAlpha(0);
+        this.tweens.add({ targets: o, alpha: 1, duration: 400, delay: 700 + i * 120 });
+      });
 
-    // Stats section header
-    this.add.text(GAME_WIDTH / 2, 235, 'BATTLE STATISTICS', {
-      fontSize: '22px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffaa00',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5);
+      const total = v1 + v2;
+      const split = total > 0 ? v1 / total : 0.5;
+      const anim = { k: 0 };
+      this.tweens.add({
+        targets: anim,
+        k: 1,
+        duration: 700,
+        delay: 750 + i * 120,
+        ease: 'Cubic.easeOut',
+        onUpdate: () => {
+          // Redraw every row; cheap and keeps rows independent of draw order.
+          this.statProgress = this.statProgress || [];
+          this.statProgress[i] = { k: anim.k, split, y };
+          statG.clear();
+          for (const r of this.statProgress) {
+            if (!r) continue;
+            const x0 = col - barW / 2;
+            statG.fillStyle(PALETTE.ink, 0.7);
+            statG.fillRect(x0, r.y + 4, barW, 5);
+            statG.fillStyle(PLAYER_COLORS[0], 1);
+            statG.fillRect(x0, r.y + 4, barW * r.split * r.k, 5);
+            statG.fillStyle(PLAYER_COLORS[1], 1);
+            const w2 = barW * (1 - r.split) * r.k;
+            statG.fillRect(x0 + barW - w2, r.y + 4, w2, 5);
+            statG.fillStyle(PALETTE.bone, 1);
+            statG.fillRect(x0 + barW * r.split - 1, r.y + 1, 2, 11);
+          }
+        },
+      });
+    });
 
-    // Player labels
-    const col1X = GAME_WIDTH / 2 - 180;
-    const col2X = GAME_WIDTH / 2 + 180;
-    const labelX = GAME_WIDTH / 2;
-
-    this.add.text(col1X, 270, 'PLAYER 1', {
-      fontSize: '20px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#4fc3f7',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5);
-
-    this.add.text(col2X, 270, 'PLAYER 2', {
-      fontSize: '20px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ff5252',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5);
-
-    // Stat rows
-    const statRows = [
-      { label: 'Hits Landed', key: 'hitsLanded' },
-      { label: 'Damage Dealt', key: 'damageDealt' },
-      { label: 'Specials Used', key: 'specialsUsed' },
+    const rematch = () => transitionTo(this, 'Versus', {
+      mode: matchData.mode,
+      warrior1: matchData.warrior1Id,
+      warrior2: matchData.warrior2Id,
+      arena: matchData.arenaId,
+    });
+    const buttons = [
+      createTextButton(this, col - 235, 580, 'REMATCH', rematch, { size: 19, width: 190 }),
+      createTextButton(this, col, 580, 'NEW WARRIORS', () => transitionTo(this, 'CharacterSelect', { mode: matchData.mode }), { size: 19, width: 240 }),
+      createTextButton(this, col + 235, 580, 'MAIN MENU', () => transitionTo(this, 'Title'), { size: 19, width: 190, color: HEX.ash }),
     ];
-
-    statRows.forEach((row, i) => {
-      const y = 310 + i * 40;
-
-      // Label
-      this.add.text(labelX, y, row.label.toUpperCase(), {
-        fontSize: '16px',
-        fontFamily: 'Impact, sans-serif',
-        color: '#aaaaaa',
-      }).setOrigin(0.5);
-
-      // P1 value
-      const v1 = stats[0][row.key];
-      this.add.text(col1X, y, String(Math.round(v1)), {
-        fontSize: '24px',
-        fontFamily: 'Impact, sans-serif',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 3,
-      }).setOrigin(0.5);
-
-      // P2 value
-      const v2 = stats[1][row.key];
-      this.add.text(col2X, y, String(Math.round(v2)), {
-        fontSize: '24px',
-        fontFamily: 'Impact, sans-serif',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 3,
-      }).setOrigin(0.5);
-
-      // Highlight winner of each stat
-      // (visual cue only)
+    buttons.forEach((b, i) => {
+      b.container.setAlpha(0);
+      this.tweens.add({ targets: b.container, alpha: 1, duration: 400, delay: 1200 + i * 80 });
     });
+    bindMenuKeys(this, buttons, { horizontal: true });
 
-    // Buttons
-    const btnY = 510;
-
-    // Rematch
-    this.createButton(GAME_WIDTH / 2 - 150, btnY, 'REMATCH', () => {
-      this.scene.start('Fight', {
-        mode: matchData.mode,
-        warrior1: matchData.warrior1Id,
-        warrior2: matchData.warrior2Id,
-        arena: matchData.arenaId,
-      });
-    });
-
-    // New Warriors
-    this.createButton(GAME_WIDTH / 2 + 150, btnY, 'NEW WARRIORS', () => {
-      this.scene.start('CharacterSelect', { mode: matchData.mode });
-    });
-
-    // Main Menu (smaller, below)
-    const menuText = this.add.text(GAME_WIDTH / 2, btnY + 60, 'MAIN MENU', {
-      fontSize: '16px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#aaaaaa',
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    menuText.on('pointerover', () => {
-      SoundManager.playUIHover(this);
-      menuText.setColor('#ffffff');
-    });
-    menuText.on('pointerout', () => menuText.setColor('#aaaaaa'));
-    menuText.on('pointerdown', () => {
-      SoundManager.playUIClick(this);
-      this.scene.start('Title');
-    });
-
-    // Keyboard shortcuts
-    this.input.keyboard.on('keydown-R', () => {
-      this.scene.start('Fight', {
-        mode: matchData.mode,
-        warrior1: matchData.warrior1Id,
-        warrior2: matchData.warrior2Id,
-        arena: matchData.arenaId,
-      });
-    });
-    this.input.keyboard.on('keydown-ESC', () => {
-      this.scene.start('Title');
-    });
-
-    // Key hints
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 45, 'R = REMATCH  •  ESC = MAIN MENU', {
-      fontSize: '14px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5);
-  }
-
-  createButton(x, y, label, onClick) {
-    const btn = this.add.rectangle(x, y, 220, 50, 0x111111)
-      .setInteractive({ useHandCursor: true });
-    this.add.rectangle(x, y, 220, 50).setStrokeStyle(3, 0xffcc00);
-
-    const text = this.add.text(x, y, label, {
-      fontSize: '20px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
-
-    btn.on('pointerover', () => {
-      SoundManager.playUIHover(this);
-      btn.setFillStyle(0x333333);
-      text.setScale(1.05);
-    });
-    btn.on('pointerout', () => {
-      btn.setFillStyle(0x111111);
-      text.setScale(1);
-    });
-    btn.on('pointerdown', () => {
-      SoundManager.playUIClick(this);
-      onClick();
-    });
+    this.input.keyboard.on('keydown-R', rematch);
+    this.input.keyboard.on('keydown-ESC', () => transitionTo(this, 'Title'));
+    addKeyHint(this, '← →  CHOOSE     ENTER  CONFIRM     R  REMATCH     ESC  MENU');
   }
 }

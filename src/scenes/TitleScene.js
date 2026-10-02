@@ -1,6 +1,11 @@
 import Phaser from 'phaser';
-import { SoundManager } from '../audio/SoundManager.js';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/constants.js';
+import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
+import { WARRIORS } from '../config/warriors.js';
+import {
+  PALETTE, HEX, displayText, bodyText, Backdrop, drawRule,
+  createTextButton, bindMenuKeys, transitionTo, fadeIn, addKeyHint,
+} from '../ui/theme.js';
+import { Showcase } from '../ui/Showcase.js';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -8,184 +13,102 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create() {
-    // Dynamic Arena Background
-    const bgArena = 'arena_castle'; // Or randomize it
-    const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, bgArena);
-    bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
-    bg.setTint(0x555555); // Darken for text contrast
+    fadeIn(this, 600);
+    const cx = GAME_WIDTH / 2;
 
-    // Heavy Decorative border
-    const border = this.add.graphics();
-    border.lineStyle(4, 0x000000, 0.8);
-    border.strokeRect(30, 30, GAME_WIDTH - 60, GAME_HEIGHT - 60);
-    border.lineStyle(2, COLORS.gold, 0.8);
-    border.strokeRect(36, 36, GAME_WIDTH - 72, GAME_HEIGHT - 72);
-
-    // Corner ornaments
-    const corners = [[40, 40], [GAME_WIDTH - 40, 40], [40, GAME_HEIGHT - 40], [GAME_WIDTH - 40, GAME_HEIGHT - 40]];
-    for (const [cx, cy] of corners) {
-      border.fillStyle(COLORS.gold, 1);
-      border.fillCircle(cx, cy, 8);
-      border.lineStyle(2, 0x000000, 1);
-      border.strokeCircle(cx, cy, 8);
-    }
-
-    // Title Drop Shadow
-    this.add.text(GAME_WIDTH / 2 + 5, 185, 'BLADE', {
-      fontSize: '108px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#000000',
-      alpha: 0.8
-    }).setOrigin(0.5);
-
-    // Title — "BLADE"
-    this.add.text(GAME_WIDTH / 2, 180, 'BLADE', {
-      fontSize: '108px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 8,
-    }).setOrigin(0.5);
-
-    // Subtitle — "of Ages"
-    this.add.text(GAME_WIDTH / 2 + 3, 273, 'of Ages', {
-      fontSize: '52px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'italic',
-      color: '#000000',
-      alpha: 0.8
-    }).setOrigin(0.5);
-
-    this.add.text(GAME_WIDTH / 2, 270, 'of Ages', {
-      fontSize: '52px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'italic',
-      color: '#ffd700',
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
-
-    // Decorative sword divider
-    const divider = this.add.graphics();
-    divider.lineStyle(2, COLORS.inkBrown, 0.6);
-    divider.beginPath();
-    divider.moveTo(GAME_WIDTH / 2 - 150, 320);
-    divider.lineTo(GAME_WIDTH / 2 - 20, 320);
-    divider.stroke();
-    divider.beginPath();
-    divider.moveTo(GAME_WIDTH / 2 + 20, 320);
-    divider.lineTo(GAME_WIDTH / 2 + 150, 320);
-    divider.stroke();
-    // Sword icon in middle
-    divider.fillStyle(COLORS.inkBrown, 0.8);
-    divider.fillRect(GAME_WIDTH / 2 - 2, 308, 4, 24);
-    divider.fillRect(GAME_WIDTH / 2 - 10, 318, 20, 4);
-
-    // Tagline backdrop
-    this.add.rectangle(GAME_WIDTH / 2, 370, 400, 30, 0x000000, 0.6);
-
-    // Tagline
-    this.add.text(GAME_WIDTH / 2, 370, 'Warriors across time. One battlefield.', {
-      fontSize: '18px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'italic',
-      color: '#ffffff',
-    }).setOrigin(0.5);
-
-    // Start button
-    const btnY = 430;
-    const btn = this.add.rectangle(GAME_WIDTH / 2, btnY, 260, 60, 0x8b0000)
-      .setInteractive({ useHandCursor: true });
-    const btnBorder = this.add.rectangle(GAME_WIDTH / 2, btnY, 260, 60)
-      .setStrokeStyle(4, COLORS.gold);
-    const btnText = this.add.text(GAME_WIDTH / 2, btnY, 'ENTER BATTLE', {
-      fontSize: '26px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
-
-    btn.on('pointerover', () => {
-      SoundManager.playUIHover(this);
-      btn.setFillStyle(0xff0000);
-      btnText.setScale(1.1);
-      btnBorder.setScale(1.05);
-    });
-    btn.on('pointerout', () => {
-      btn.setFillStyle(0x8b0000);
-      btnText.setScale(1);
-      btnBorder.setScale(1);
-    });
-    btn.on('pointerdown', () => {
-      SoundManager.playUIClick(this);
-      this.scene.start('ModeSelect');
+    new Backdrop(this, 'castle', {
+      grade: { saturation: -0.85, brightness: 0.5, contrast: 0.25, tint: [1.0, 0.92, 0.88] },
     });
 
-    // Instructions button
-    const instY = 510;
-    const instBtn = this.add.rectangle(GAME_WIDTH / 2, instY, 260, 60, 0x111111)
-      .setInteractive({ useHandCursor: true });
-    const instBorder = this.add.rectangle(GAME_WIDTH / 2, instY, 260, 60)
-      .setStrokeStyle(4, COLORS.gold);
-    const instText = this.add.text(GAME_WIDTH / 2, instY, 'HOW TO PLAY', {
-      fontSize: '22px',
-      fontFamily: 'Impact, sans-serif',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
+    // Two warriors from different ages squaring off across the title.
+    const [left, right] = Phaser.Utils.Array.Shuffle([...WARRIORS]).slice(0, 2);
+    const groundY = GAME_HEIGHT - 60;
+    this.addRimLight(250, groundY, PALETTE.p1);
+    this.addRimLight(GAME_WIDTH - 250, groundY, PALETTE.p2);
+    new Showcase(this, left, 250, groundY, { scale: 3.5, facingRight: true });
+    new Showcase(this, right, GAME_WIDTH - 250, groundY, { scale: 3.5, facingRight: false });
 
-    instBtn.on('pointerover', () => {
-      SoundManager.playUIHover(this);
-      instBtn.setFillStyle(0x333333);
-      instText.setScale(1.1);
-      instBorder.setScale(1.05);
-    });
-    instBtn.on('pointerout', () => {
-      instBtn.setFillStyle(0x111111);
-      instText.setScale(1);
-      instBorder.setScale(1);
-    });
-    instBtn.on('pointerdown', () => {
-      SoundManager.playUIClick(this);
-      this.scene.start('Instructions');
-    });
+    // Title lockup.
+    const blade = this.add.text(cx, 200, 'BLADE', displayText(132, {
+      weight: '900', spacing: 34, shadowBlur: 24,
+    })).setOrigin(0.5).setDepth(30).setAlpha(0).setScale(1.12);
 
-    // Also start on any key press
-    this.input.keyboard.once('keydown', () => {
-      this.scene.start('ModeSelect');
-    });
+    const ofAges = this.add.text(cx, 292, 'OF  AGES', displayText(30, {
+      weight: '700', spacing: 22, color: HEX.gold,
+    })).setOrigin(0.5).setDepth(30).setAlpha(0);
 
-    // Subtle animated glow on title
+    const rule = this.add.graphics().setDepth(30).setAlpha(0);
+    drawRule(rule, cx, 334, 170);
+
+    const tagline = this.add.text(cx, 362, 'Warriors across time. One battlefield.', bodyText(21, {
+      italic: true, color: HEX.ash,
+    })).setOrigin(0.5).setDepth(30).setAlpha(0);
+
+    // The cut: a crimson slash rips across the lockup, then the title lands.
+    const slash = this.add.graphics().setDepth(31).setBlendMode(Phaser.BlendModes.ADD);
+    const cut = { t: 0 };
     this.tweens.add({
-      targets: btnBorder,
-      alpha: 0.4,
-      duration: 1000,
-      yoyo: true,
-      repeat: -1,
+      targets: cut,
+      t: 1,
+      delay: 250,
+      duration: 340,
+      ease: 'Expo.easeOut',
+      onUpdate: () => {
+        slash.clear();
+        const x0 = cx - 420;
+        const x1 = x0 + 840 * cut.t;
+        slash.fillStyle(PALETTE.crimsonBright, 0.95);
+        slash.fillTriangle(x0, 236, x1, 168 + 4, x1, 168 - 2);
+        slash.fillStyle(0xffffff, 0.9);
+        slash.fillTriangle(x0 + 40, 230, x1, 170, x1, 168);
+      },
+      onComplete: () => {
+        this.cameras.main.flash(180, 224, 40, 63);
+        this.cameras.main.shake(160, 0.006);
+        this.tweens.add({ targets: slash, alpha: 0, duration: 900, ease: 'Quad.easeIn' });
+        this.tweens.add({ targets: blade, alpha: 1, scale: 1, duration: 420, ease: 'Expo.easeOut' });
+        this.tweens.add({ targets: [ofAges, rule], alpha: 1, duration: 600, delay: 120 });
+        this.tweens.add({ targets: tagline, alpha: 1, duration: 800, delay: 300 });
+      },
     });
 
-    // "Press any key" hint
-    const hint = this.add.text(GAME_WIDTH / 2, 590, 'Press any key or click to start', {
-      fontSize: '14px',
-      fontFamily: 'Georgia, serif',
-      color: '#8d6e63',
-    }).setOrigin(0.5);
-
+    // Slow breathing glow behind the title.
+    const halo = this.add.image(cx, 230, 'fx_soft').setDepth(29).setScale(14, 5)
+      .setTint(PALETTE.crimson).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({ targets: halo, alpha: 0.22, duration: 1200, delay: 600 });
     this.tweens.add({
-      targets: hint,
-      alpha: 0.3,
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
+      targets: halo, scaleX: 15.5, duration: 3200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
 
-    // Version
-    this.add.text(GAME_WIDTH - 50, GAME_HEIGHT - 40, 'v1.0', {
-      fontSize: '12px',
-      fontFamily: 'Georgia, serif',
-      color: '#a1887f',
-    }).setOrigin(0.5);
+    const buttons = [
+      createTextButton(this, cx, 470, 'ENTER BATTLE', () => transitionTo(this, 'ModeSelect'), {
+        size: 28, width: 360,
+      }),
+      createTextButton(this, cx, 536, 'HOW TO PLAY', () => transitionTo(this, 'Instructions'), {
+        size: 20, width: 300, color: HEX.ash,
+      }),
+    ];
+    buttons.forEach((b, i) => {
+      b.container.setAlpha(0);
+      this.tweens.add({ targets: b.container, alpha: 1, duration: 500, delay: 900 + i * 120 });
+    });
+    bindMenuKeys(this, buttons);
+
+    addKeyHint(this, '↑ ↓  CHOOSE     ENTER  CONFIRM');
+    this.add.text(GAME_WIDTH - 28, GAME_HEIGHT - 24, 'v2.0', displayText(10, {
+      color: HEX.ashDark, weight: '500', spacing: 2, shadow: false,
+    })).setOrigin(1, 1).setDepth(50);
+  }
+
+  // A coloured pool of light at a fighter's feet: separates the figure from
+  // the graded backdrop and tags the side.
+  addRimLight(x, groundY, color) {
+    const pool = this.add.image(x, groundY, 'fx_soft').setDepth(5)
+      .setScale(7, 1.6).setTint(color).setAlpha(0.28).setBlendMode(Phaser.BlendModes.ADD);
+    const glow = this.add.image(x, groundY - 170, 'fx_soft').setDepth(4)
+      .setScale(6, 9).setTint(color).setAlpha(0.08).setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({
+      targets: [pool, glow], alpha: '*=0.7', duration: 2400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
   }
 }

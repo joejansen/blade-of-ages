@@ -59,7 +59,10 @@ export class Fighter {
     // Prefer the asset-driven sprite renderer; fall back to the vector
     // renderer if any part texture is missing so development builds without
     // the art pipeline output still render a fighter.
-    const assetRenderer = new AssetWarriorRenderer(scene, warriorConfig);
+    const assetRenderer = new AssetWarriorRenderer(scene, warriorConfig, {
+      depth: 12 + playerIndex,
+      shadowDepth: 9.5,
+    });
     if (assetRenderer.isAvailable()) {
       this.renderer = assetRenderer;
     } else {
@@ -219,7 +222,13 @@ export class Fighter {
 
     if (newState === 'lightAttack') SoundManager.playCombat(this.scene, 'light_attack');
     else if (newState === 'heavyAttack') SoundManager.playCombat(this.scene, 'heavy_attack');
-    else if (newState === 'special') SoundManager.playCombat(this.scene, 'special');
+    else if (newState === 'special') {
+      SoundManager.playCombat(this.scene, 'special');
+      this.scene.events.emit('fighter-special', this);
+    }
+
+    // The fighter acting takes the front of the stage.
+    if (this.isAttacking()) this.scene.events.emit('fighter-front', this);
     else if (newState === 'jumping') SoundManager.playCombat(this.scene, 'jump');
 
     if (newState === 'lightAttack' || newState === 'heavyAttack' ||
@@ -296,22 +305,28 @@ export class Fighter {
     );
   }
 
+  // White-out the rig for a few frames on a clean hit.
+  flash() {
+    this.renderer.setFlash?.(0xffffff, true);
+    this.scene.time.delayedCall(70, () => this.renderer?.setFlash?.(0xffffff, false));
+  }
+
   spawnLandingDust() {
     const color = this.profile.fx.dustColor;
-    const burstY = this.sprite.y - 4;
-    const offsets = [-24, -12, 0, 12, 24];
+    const burstY = this.sprite.y + 12;
+    const offsets = [-30, -15, 0, 15, 30];
 
     for (const offset of offsets) {
-      const puff = this.scene.add.ellipse(this.sprite.x + offset, burstY, 14, 8, color, 0.5);
-      puff.setDepth(9);
+      const puff = this.scene.add.image(this.sprite.x + offset, burstY, 'fx_soft')
+        .setTint(color).setAlpha(0.55).setScale(0.5, 0.3).setDepth(9.6);
       this.scene.tweens.add({
         targets: puff,
-        x: puff.x + offset * 0.5,
-        y: puff.y - 10 - Math.abs(offset) * 0.08,
-        scaleX: 1.8,
-        scaleY: 1.5,
+        x: puff.x + offset * 1.2,
+        y: puff.y - 8 - Math.abs(offset) * 0.1,
+        scaleX: 1.4,
+        scaleY: 0.8,
         alpha: 0,
-        duration: 260,
+        duration: 360,
         ease: 'Quad.easeOut',
         onComplete: () => puff.destroy(),
       });
