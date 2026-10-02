@@ -1,4 +1,6 @@
+import Phaser from 'phaser';
 import { getFighterProfile } from '../config/fighterProfiles.js';
+import { GROUND_Y } from '../config/constants.js';
 import { computeWeaponGeometry } from './weaponGeometry.js';
 
 // Sprite-driven fighter renderer. Consumes the PNG parts produced by the
@@ -30,7 +32,7 @@ const HIP_FROM_TORSO_TOP = 28;
 // the same scale as before: torso ~ TORSO_LEN, limbs ~ half of the arm /
 // leg reach, head just above the torso. Weapon is scaled per-fighter from
 // profile.trail.renderedWeaponLength so the drawn blade matches the trail.
-const PART_TARGET_HEIGHT = {
+export const PART_TARGET_HEIGHT = {
   head: 40,
   torso: 64,
   upper_arm: 24,
@@ -70,6 +72,16 @@ const SLOT_Z = {
 };
 
 const BACK_LIMB_ALPHA = 0.72;
+const BACK_LIMB_TINT = 0x9a9590;
+// Number of motion samples kept for the weapon ribbon. At 60fps this is
+// ~130ms of swing, long enough to read as an arc without lagging the blade.
+const TRAIL_SAMPLES = 8;
+// Fraction of the blade (from the hand) where the ribbon's inner edge sits,
+// so the smear hugs the cutting edge rather than filling a pie wedge.
+const TRAIL_INNER = 0.38;
+// The leg sprites overhang the pose's foot anchor; at rest the visible sole
+// sits this many (unscaled) pixels below baseY.
+export const FOOT_DROP = 14;
 
 // Rotation that points each limb along a target direction given that the
 // PNG naturally extends downward from its pivot.
@@ -80,13 +92,21 @@ function limbRotation(dx, dy) {
 }
 
 export class AssetWarriorRenderer {
-  constructor(scene, warriorConfig) {
+  // options.displayScale enlarges the whole rig (menu showcases);
+  // options.depth moves the rig's depth band; options.groundY pins the
+  // shadow to a floor line (defaults to the fight's GROUND_Y).
+  constructor(scene, warriorConfig, options = {}) {
     this.scene = scene;
     this.config = warriorConfig;
     this.profile = getFighterProfile(warriorConfig.id);
     this.parts = {};
     this.baseScales = {};
     this.available = true;
+    this.displayScale = options.displayScale ?? 1;
+    this.depthBase = options.depth ?? 12;
+    this.groundY = options.groundY ?? GROUND_Y;
+    this.shadowDepth = options.shadowDepth;
+    this.trailHistory = [];
 
     for (const [slot, spriteName] of Object.entries(SLOT_TO_SPRITE)) {
       const textureKey = `warrior_${warriorConfig.id}_${spriteName}`;
@@ -112,19 +132,64 @@ export class AssetWarriorRenderer {
         image.setOrigin(0.5, 0.08);
       }
 
-      image.setDepth(12 + SLOT_Z[slot] * 0.01);
       if (slot.startsWith('back_')) {
+        // Push back limbs into shade so the silhouette reads in depth.
         image.setAlpha(BACK_LIMB_ALPHA);
+        image.setTint(BACK_LIMB_TINT);
       }
       image.setVisible(false);
       this.parts[slot] = image;
     }
 
+    this.shadowGraphics = scene.add.graphics();
     this.trailGraphics = scene.add.graphics();
-    this.trailGraphics.setDepth(12.25);
-
+    this.trailGraphics.setBlendMode(Phaser.BlendModes.ADD);
     this.glowGraphics = scene.add.graphics();
-    this.glowGraphics.setDepth(11.9);
+    this.glowGraphics.setBlendMode(Phaser.BlendModes.ADD);
+    this.auraImage = scene.textures.exists('fx_soft')
+      ? scene.add.image(0, 0, 'fx_soft').setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(this.profile.fx.specialGlow).setVisible(false)
+      : null;
+    this.setDepthBase(this.depthBase);
+  }
+
+  setDepthBase(base) {
+    this.depthBase = base;
+    for (const [slot, img] of Object.entries(this.parts)) {
+      img.setDepth(base + SLOT_Z[slot] * 0.01);
+    }
+    this.shadowGraphics.setDepth(this.shadowDepth ?? base - 0.3);
+    this.trailGraphics.setDepth(base + 0.25);
+    this.glowGraphics.setDepth(base - 0.1);
+    this.auraImage?.setDepth(base - 0.12);
+  }
+
+  setVisible(visible) {
+    for (const img of Object.values(this.parts)) img.setVisible(visible);
+    this.shadowGraphics.setVisible(visible);
+    this.trailGraphics.setVisible(visible);
+    this.glowGraphics.setVisible(visible);
+    if (!visible) this.auraImage?.setVisible(false);
+  }
+
+  setAlpha(alpha) {
+    for (const [slot, img] of Object.entries(this.parts)) {
+      img.setAlpha(alpha * (slot.startsWith('back_') ? BACK_LIMB_ALPHA : 1));
+    }
+    this.shadowGraphics.setAlpha(alpha);
+    this.trailGraphics.setAlpha(alpha);
+    this.glowGraphics.setAlpha(alpha);
+    this.auraAlphaScale = alpha;
+  }
+
+  // Flash every part toward a colour (hit flash / special charge).
+  setFlash(color, on) {
+    if (this.flashing === on) return;
+    this.flashing = on;
+    for (const [slot, img] of Object.entries(this.parts)) {
+      if (on) img.setTintFill(color);
+      else img.setTint(slot.startsWith('back_') ? BACK_LIMB_TINT : 0xffffff);
+    }
   }
 
   isAvailable() {
@@ -136,7 +201,7 @@ export class AssetWarriorRenderer {
     const dir = facingRight ? 1 : -1;
     const profile = this.profile;
     const anchors = profile.anchors;
-    const scale = profile.renderScale;
+    const scale = profile.renderScale * this.displayScale;
 
     // worldRefX/worldRefY is the scale pivot — everything below is expressed
     // as a local offset from that point and then scaled by profile.renderScale
@@ -211,8 +276,23 @@ export class AssetWarriorRenderer {
       img.setFlipX(!facingRight);
     }
 
+    this.#drawShadow(x, baseY);
     this.#drawAura(x, baseY, pose, specialRatio);
     this.#drawTrail(geom, dir, pose);
+  }
+
+  #drawShadow(x, baseY) {
+    const g = this.shadowGraphics;
+    g.clear();
+    const lift = Math.max(0, this.groundY - baseY);
+    const k = Phaser.Math.Clamp(1 - lift / 320, 0.25, 1);
+    const w = 78 * this.displayScale * k;
+    const h = 14 * this.displayScale * k;
+    const y = this.groundY + FOOT_DROP * this.profile.renderScale * this.displayScale;
+    g.fillStyle(0x000000, 0.22 * k);
+    g.fillEllipse(x, y + 1, w * 1.5, h * 1.6);
+    g.fillStyle(0x000000, 0.45 * k);
+    g.fillEllipse(x, y, w, h);
   }
 
   #place(slot, x, y, rotation, scale) {
@@ -226,33 +306,98 @@ export class AssetWarriorRenderer {
   #drawAura(x, baseY, pose, specialRatio) {
     this.glowGraphics.clear();
     const strength = Math.max(pose.glow || 0, specialRatio || 0);
-    if (strength <= 0.01) return;
+    if (strength <= 0.01) {
+      this.auraImage?.setVisible(false);
+      return;
+    }
 
     const color = this.profile.fx.specialGlow;
+    const ds = this.displayScale;
     const cx = x + this.profile.renderOffsetX;
-    const cy = baseY + this.profile.renderOffsetY + AURA_OFFSET_Y;
+    const cy = baseY + (this.profile.renderOffsetY + AURA_OFFSET_Y) * ds;
+    const t = this.scene.time.now / 1000;
+    const pulse = 0.85 + Math.sin(t * 6) * 0.15;
 
-    this.glowGraphics.fillStyle(color, 0.08 + strength * 0.12);
-    this.glowGraphics.fillEllipse(cx, cy, 92, 120);
-    this.glowGraphics.lineStyle(2, color, 0.15 + strength * 0.2);
-    this.glowGraphics.strokeEllipse(cx, cy, 92, 120);
+    // Layered additive halo; full meter breathes.
+    const full = specialRatio >= 1;
+    const k = strength * (full ? pulse : 0.6);
+    if (this.auraImage) {
+      // Soft radial halo; the texture's falloff does the feathering.
+      this.auraImage.setVisible(true).setPosition(cx, cy)
+        .setScale((120 * ds) / 64, (170 * ds) / 64)
+        .setAlpha((0.12 + k * 0.28) * (this.auraAlphaScale ?? 1));
+    }
+    if (full) {
+      // Rising motes along the silhouette.
+      for (let i = 0; i < 6; i++) {
+        const phase = (t * 0.9 + i / 6) % 1;
+        const px = cx + Math.sin(i * 2.3 + t * 2) * 30 * ds;
+        const py = baseY - phase * 120 * ds;
+        this.glowGraphics.fillStyle(color, (1 - phase) * 0.8);
+        this.glowGraphics.fillCircle(px, py, (2.5 - phase * 1.5) * ds);
+      }
+    }
   }
 
   #drawTrail(geom, dir, pose) {
     this.trailGraphics.clear();
     const trail = this.profile.trail;
-    if (!pose.trailAlpha || trail.style === 'none') return;
+    if (!pose.trailAlpha || trail.style === 'none') {
+      this.trailHistory.length = 0;
+      return;
+    }
 
     const alpha = pose.trailAlpha * trail.alphaScale;
-    if (alpha <= 0.01) return;
+    if (alpha <= 0.01) {
+      this.trailHistory.length = 0;
+      return;
+    }
 
     const color = this.profile.fx.trailColor;
     const width = (pose.trailWidth ?? this.profile.weaponWidth) * trail.widthScale;
 
+    this.#recordTrail(geom);
+    this.#drawRibbon(color, alpha);
+
     if (trail.style === 'thrust' || trail.style === 'stock') {
-      this.#drawThrustSmear(geom, dir, width, color, alpha, trail);
+      this.#drawThrustSmear(geom, dir, width, color, alpha * 0.8, trail);
     } else {
-      this.#drawArcSmear(geom, trail.sweep, dir, width, color, alpha);
+      this.#drawArcSmear(geom, trail.sweep, dir, width, color, alpha * 0.6);
+    }
+  }
+
+  // Only record when the blade actually moves: during hitstop the pose is
+  // frozen and the ribbon should freeze with it rather than collapse.
+  #recordTrail(geom) {
+    const last = this.trailHistory[this.trailHistory.length - 1];
+    const innerX = geom.handX + (geom.tipX - geom.handX) * TRAIL_INNER;
+    const innerY = geom.handY + (geom.tipY - geom.handY) * TRAIL_INNER;
+    if (last && Math.hypot(last.tx - geom.tipX, last.ty - geom.tipY) < 1.5) return;
+    this.trailHistory.push({ ix: innerX, iy: innerY, tx: geom.tipX, ty: geom.tipY });
+    if (this.trailHistory.length > TRAIL_SAMPLES) this.trailHistory.shift();
+  }
+
+  #drawRibbon(color, alpha) {
+    const h = this.trailHistory;
+    if (h.length < 2) return;
+    const g = this.trailGraphics;
+    const n = h.length;
+    for (let i = 1; i < n; i++) {
+      const a = h[i - 1];
+      const b = h[i];
+      const k = i / (n - 1);
+      g.fillStyle(color, alpha * 0.55 * k * k);
+      g.fillPoints([
+        { x: a.ix, y: a.iy }, { x: a.tx, y: a.ty }, { x: b.tx, y: b.ty }, { x: b.ix, y: b.iy },
+      ], true);
+    }
+    // White-hot leading edge along the tip path.
+    for (let i = 1; i < n; i++) {
+      const a = h[i - 1];
+      const b = h[i];
+      const k = i / (n - 1);
+      g.lineStyle(1 + k * 2.5 * this.displayScale, 0xffffff, alpha * 0.9 * k);
+      g.lineBetween(a.tx, a.ty, b.tx, b.ty);
     }
   }
 
@@ -314,5 +459,7 @@ export class AssetWarriorRenderer {
     this.parts = {};
     this.trailGraphics?.destroy();
     this.glowGraphics?.destroy();
+    this.shadowGraphics?.destroy();
+    this.auraImage?.destroy();
   }
 }

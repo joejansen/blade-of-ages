@@ -4,9 +4,10 @@ import { DebugOverlay } from '../fighters/DebugOverlay.js';
 import { CombatManager } from '../combat/CombatManager.js';
 import { InputManager } from '../combat/InputManager.js';
 import { AIController } from '../ai/AIController.js';
-import { HUD } from '../ui/HUD.js';
 import { SoundManager } from '../audio/SoundManager.js';
 import { ArenaRenderer } from '../art/ArenaRenderer.js';
+import { CameraRig } from '../fx/CameraRig.js';
+import { fadeIn, transitionTo } from '../ui/theme.js';
 import { getWarriorById } from '../config/warriors.js';
 import {
   GAME_WIDTH,
@@ -33,8 +34,11 @@ export class FightScene extends Phaser.Scene {
 
   create() {
     const { mode, warrior1Id, warrior2Id, arenaId } = this.matchData;
+    fadeIn(this, 300);
 
     this.arenaRenderer = new ArenaRenderer(this, arenaId);
+    this.cameraRig = new CameraRig(this);
+    this.slowmo = 1;
 
     // Set world bounds
     this.physics.world.setBounds(30, 0, GAME_WIDTH - 60, GROUND_Y);
@@ -57,8 +61,19 @@ export class FightScene extends Phaser.Scene {
     // Combat system
     this.combatManager = new CombatManager(this);
 
-    // HUD
-    this.hud = new HUD(this, w1Config, w2Config);
+    // HUD runs as an overlay scene so it ignores the fight camera.
+    this.w1Config = w1Config;
+    this.w2Config = w2Config;
+    this.scene.launch('FightHUD', { warrior1Config: w1Config, warrior2Config: w2Config });
+    this.hudScene = this.scene.get('FightHUD');
+    this.scene.bringToTop('FightHUD');
+
+    this.events.on('fighter-special', this.onSpecial, this);
+    this.events.on('fighter-front', (f) => {
+      f.renderer.setDepthBase?.(13.5);
+      const other = f === this.fighter1 ? this.fighter2 : this.fighter1;
+      other.renderer.setDepthBase?.(12);
+    });
 
     // Debug overlay (F1 to toggle)
     this.debugOverlay = new DebugOverlay(this);
@@ -73,23 +88,28 @@ export class FightScene extends Phaser.Scene {
     this.roundTimer = ROUND_START_DELAY;
     this.roundTime = 0;
 
-    // Show round announcement
-    this.showRoundAnnouncement(`Round ${this.currentRound}`, 'FIGHT!');
+    // Wait a frame for the HUD scene to come up before announcing.
+    this.time.delayedCall(60, () => this.hudScene.announceRound(this.currentRound));
 
     // Capture keyboard events for game input
     this.input.keyboard.enableGlobalCapture();
 
     // Clean up when scene shuts down
-    this.events.on('shutdown', this.cleanUp, this);
+    this.events.once('shutdown', this.cleanUp, this);
   }
 
   update(time, delta) {
-    this.arenaRenderer?.update(time, delta);
+    this.arenaRenderer?.update(time, delta, (this.fighter1.x + this.fighter2.x) / 2);
+    this.cameraRig.update(delta, this.fighter1, this.fighter2);
+    // Slow motion applies to the fighters and physics, not to the camera.
+    const simDelta = delta * this.slowmo;
 
     // Round state management
     switch (this.roundState) {
       case 'starting':
         this.roundTimer -= delta;
+        this.fighter1.draw();
+        this.fighter2.draw();
         if (this.roundTimer <= 0) {
           this.roundState = 'fighting';
         }
@@ -100,23 +120,25 @@ export class FightScene extends Phaser.Scene {
         break;
 
       case 'roundEnd':
-        this.roundTimer -= delta;
-        this.fighter1.update(time, delta);
-        this.fighter2.update(time, delta);
-        if (this.roundTimer <= 0) {
-          this.startNextRound();
-        }
-        break;
-
       case 'matchEnd':
         this.roundTimer -= delta;
-        this.fighter1.update(time, delta);
-        this.fighter2.update(time, delta);
+        // The killing blow's hitstop is still running; let it finish (and
+        // restore gravity/knockback) before the fighters move again.
+        if (this.combatManager.tickHitstop(delta)) {
+          this.fighter1.draw();
+          this.fighter2.draw();
+        } else {
+          this.fighter1.update(time, simDelta);
+          this.fighter2.update(time, simDelta);
+        }
         if (this.roundTimer <= 0) {
-          this.endMatch();
+          if (this.roundState === 'roundEnd') this.startNextRound();
+          else this.endMatch();
         }
         break;
     }
+
+    this.hudScene?.updateHUD?.([this.fighter1, this.fighter2], this.roundWins, this.currentRound, delta);
 
     this.drawDebugOverlay();
   }
@@ -176,9 +198,6 @@ export class FightScene extends Phaser.Scene {
       this.fighter2.facingRight = this.fighter1.x > this.fighter2.x;
     }
 
-    // Update HUD
-    this.hud.update(this.fighter1, this.fighter2, this.roundWins, this.currentRound);
-
     // Track round time
     this.roundTime += delta;
 
@@ -192,30 +211,76 @@ export class FightScene extends Phaser.Scene {
     const winner = this.fighter1.isAlive() ? 0 : 1;
     this.roundWins[winner]++;
 
+    const winnerFighter = winner === 0 ? this.fighter1 : this.fighter2;
+    const loserFighter = winner === 0 ? this.fighter2 : this.fighter1;
+    const winnerConfig = winner === 0 ? this.w1Config : this.w2Config;
+    const flawless = winnerFighter.hp >= winnerFighter.maxHp;
+
+    this.playKnockout(loserFighter);
+
     if (this.roundWins[winner] >= ROUNDS_TO_WIN) {
-      // Match over
       this.roundState = 'matchEnd';
-      this.roundTimer = ROUND_END_DELAY + 500;
-
-      const winnerFighter = winner === 0 ? this.fighter1 : this.fighter2;
-      const loserFighter = winner === 0 ? this.fighter2 : this.fighter1;
-      winnerFighter.enterState('victory');
+      this.roundTimer = ROUND_END_DELAY + 2600;
+      this.time.delayedCall(900, () => winnerFighter.enterState('victory'));
       loserFighter.enterState('defeated');
-
-      const winnerConfig = winner === 0
-        ? getWarriorById(this.matchData.warrior1Id)
-        : getWarriorById(this.matchData.warrior2Id);
-      this.showRoundAnnouncement(`${winnerConfig.name}`, 'WINS!');
-      SoundManager.playCombat(this, 'victory');
+      this.hudScene.announceVictory(winnerConfig.name, winner, flawless);
+      this.time.delayedCall(1400, () => {
+        SoundManager.playCombat(this, 'victory');
+        this.cameraRig.focus(winnerFighter.x, winnerFighter.y - 90, 1.8, 2600);
+      });
     } else {
       this.roundState = 'roundEnd';
-      this.roundTimer = ROUND_END_DELAY;
-
-      const winnerFighter = winner === 0 ? this.fighter1 : this.fighter2;
-      winnerFighter.enterState('victory');
-
-      this.showRoundAnnouncement('', `Round ${this.currentRound} Over`);
+      this.roundTimer = ROUND_END_DELAY + 1400;
+      this.time.delayedCall(900, () => winnerFighter.enterState('victory'));
+      this.hudScene.announceRoundWinner(winnerConfig.name, this.currentRound);
     }
+  }
+
+  // The KO beat: slow motion, the world drains to black-and-white, the
+  // camera closes on the fallen, then colour and time return.
+  playKnockout(loser) {
+    this.hudScene.announceKO();
+    this.cameraRig.focus(loser.x, loser.y - 70, 1.75, 1300);
+    this.setSlowmo(0.25);
+    this.tweenGrade(1, 160);
+    this.arenaRenderer.setDim(0.35, 160);
+    this.time.delayedCall(1300, () => {
+      this.setSlowmo(1);
+      this.tweenGrade(0, 700);
+      this.arenaRenderer.setDim(0, 700);
+    });
+  }
+
+  onSpecial(fighter) {
+    const config = fighter === this.fighter1 ? this.w1Config : this.w2Config;
+    this.hudScene.announceSpecial(config.special.name, fighter.playerIndex);
+    this.arenaRenderer.setDim(0.6, 120);
+    this.cameraRig.focus(fighter.x, fighter.y - 80, 1.7, 420);
+    this.cameras.main.flash(90, 255, 220, 160);
+    const burst = this.add.image(fighter.x, fighter.y - 60, 'fx_ring').setDepth(11)
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(fighter.profile.fx.specialGlow).setScale(0.3);
+    this.tweens.add({ targets: burst, scale: 3.2, alpha: 0, duration: 500, ease: 'Cubic.easeOut', onComplete: () => burst.destroy() });
+    this.time.delayedCall(620, () => this.arenaRenderer.setDim(0, 300));
+  }
+
+  setSlowmo(factor) {
+    this.slowmo = factor;
+    // Arcade timeScale is inverse: 4 = quarter speed.
+    if (this.physics.world) this.physics.world.timeScale = 1 / factor;
+  }
+
+  // Drain the arena toward black-and-white (amount 0..1); the fighters
+  // keep their colour. Camera postFX would be simpler but misaligns under
+  // camera zoom in Phaser 3.90.
+  tweenGrade(target, duration) {
+    this.gradeState = this.gradeState || { k: 0 };
+    this.tweens.killTweensOf(this.gradeState);
+    this.tweens.add({
+      targets: this.gradeState,
+      k: target,
+      duration,
+      onUpdate: () => this.arenaRenderer.setDrain(this.gradeState.k),
+    });
   }
 
   startNextRound() {
@@ -223,25 +288,26 @@ export class FightScene extends Phaser.Scene {
     this.roundState = 'starting';
     this.roundTimer = ROUND_START_DELAY;
     this.roundTime = 0;
+    this.setSlowmo(1);
+    this.cameraRig.reset();
 
     // Reset fighters for new round
     this.fighter1.resetForRound(300, true);
     this.fighter2.resetForRound(GAME_WIDTH - 300, false);
+    this.hudScene.hud?.resetRound();
 
     if (this.aiController) {
       this.aiController.reset();
     }
 
-    this.showRoundAnnouncement(`Round ${this.currentRound}`, 'FIGHT!');
+    this.hudScene.announceRound(this.currentRound);
   }
 
   endMatch() {
     const winner = this.roundWins[0] >= ROUNDS_TO_WIN ? 0 : 1;
-    const winnerConfig = winner === 0
-      ? getWarriorById(this.matchData.warrior1Id)
-      : getWarriorById(this.matchData.warrior2Id);
+    const winnerConfig = winner === 0 ? this.w1Config : this.w2Config;
 
-    this.scene.start('Result', {
+    transitionTo(this, 'Result', {
       winner,
       winnerName: winnerConfig.name,
       roundWins: this.roundWins,
@@ -251,61 +317,22 @@ export class FightScene extends Phaser.Scene {
     });
   }
 
-  showRoundAnnouncement(line1, line2) {
-    const centerX = GAME_WIDTH / 2;
-    const centerY = GAME_HEIGHT / 2 - 50;
-
-    if (line1) {
-      const text1 = this.add.text(centerX, centerY - 30, line1, {
-        fontSize: '36px',
-        fontFamily: 'Georgia, serif',
-        color: '#ffd700',
-        stroke: '#000000',
-        strokeThickness: 4,
-      }).setOrigin(0.5).setDepth(100);
-
-      this.tweens.add({
-        targets: text1,
-        alpha: 0,
-        y: centerY - 60,
-        delay: 1000,
-        duration: 500,
-        onComplete: () => text1.destroy(),
-      });
-    }
-
-    const text2 = this.add.text(centerX, centerY + 20, line2, {
-      fontSize: '52px',
-      fontFamily: 'Georgia, serif',
-      fontStyle: 'bold',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 6,
-    }).setOrigin(0.5).setDepth(100).setScale(0.5);
-
-    this.tweens.add({
-      targets: text2,
-      scale: 1,
-      duration: 300,
-      ease: 'Back.easeOut',
-    });
-    this.tweens.add({
-      targets: text2,
-      alpha: 0,
-      delay: 1200,
-      duration: 400,
-      onComplete: () => text2.destroy(),
-    });
+  onCombo(playerIndex, count) {
+    this.hudScene.showCombo(playerIndex, count);
   }
 
   cleanUp() {
+    // The physics world is already torn down by now and is rebuilt (at
+    // normal time scale) on the next start, so slow-mo needs no reset here.
+    this.scene.stop('FightHUD');
+    this.events.off('fighter-special', this.onSpecial, this);
+    this.events.off('fighter-front');
     this.arenaRenderer?.destroy();
     this.fighter1?.destroy();
     this.fighter2?.destroy();
     this.input1?.destroy();
     this.input2?.destroy();
     this.combatManager?.destroy();
-    this.hud?.destroy();
     this.debugOverlay?.destroy();
   }
 }
