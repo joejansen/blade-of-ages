@@ -2,20 +2,27 @@
 export const GAME_WIDTH = 1280;
 export const GAME_HEIGHT = 720;
 
+// Fighters are authored on a ~120px rig; the fight draws and simulates them
+// at this multiple so they own roughly a third of the frame.
+export const FIGHTER_SCALE = 2;
+
 // Physics
-export const GRAVITY = 1200;
+export const GRAVITY = 2600;
 export const GROUND_Y = 580;
 
 // Combat
-export const LIGHT_ATTACK_DAMAGE = 8;
-export const HEAVY_ATTACK_DAMAGE = 18;
-export const BLOCK_DAMAGE_REDUCTION = 0.75;
+export const CHIP_DAMAGE_RATIO = 0.12;
 export const SPECIAL_METER_MAX = 100;
-export const SPECIAL_METER_PER_DAMAGE = 1.2;
-export const HITSTOP_DURATION_LIGHT = 50;
-export const HITSTOP_DURATION_HEAVY = 120;
-export const KNOCKBACK_LIGHT = 150;
-export const KNOCKBACK_HEAVY = 300;
+export const SPECIAL_METER_PER_DAMAGE = 1.0;
+export const SPECIAL_METER_PER_DAMAGE_TAKEN = 0.45;
+export const GUARD_MAX = 100;
+export const GUARD_REGEN_PER_SEC = 16;
+export const GUARD_BREAK_STUN = 950;
+export const PARRY_WINDOW = 130;      // ms after raising guard that a block parries
+export const PARRY_STUN = 620;
+export const INPUT_BUFFER = 170;      // ms an attack press waits for the fighter to be free
+export const DASH_TAP_WINDOW = 230;   // ms between taps of a double-tap
+export const ROUND_SECONDS = 60;
 
 // Rounds
 export const ROUNDS_TO_WIN = 2;
@@ -23,9 +30,9 @@ export const ROUND_START_DELAY = 1500;
 export const ROUND_END_DELAY = 2000;
 
 // Fighter defaults
-export const DEFAULT_FIGHTER_SPEED = 250;
-export const DEFAULT_FIGHTER_JUMP_FORCE = -850;
-export const DEFAULT_FIGHTER_HP = 100;
+export const DEFAULT_FIGHTER_SPEED = 330;
+export const DEFAULT_FIGHTER_JUMP_FORCE = -1150;
+export const DEFAULT_FIGHTER_HP = 150;
 
 // Arena
 export const ARENA_FLOOR_Y = GROUND_Y + 20;

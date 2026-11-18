@@ -3,7 +3,7 @@ export class SoundManager {
     if (!scene || !scene.sound || !scene.cache.audio.exists(key)) return;
     
     // Slight randomization for natural combat sounds
-    const detune = config.randomizePitch ? Math.floor(Math.random() * 400 - 200) : 0;
+    const detune = (config.detune || 0) + (config.randomizePitch ? Math.floor(Math.random() * 400 - 200) : 0);
     
     scene.sound.play(key, {
       volume: config.volume || 1.0,

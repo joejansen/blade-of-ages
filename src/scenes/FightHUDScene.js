@@ -27,9 +27,26 @@ export class FightHUDScene extends Phaser.Scene {
     this.events.once('shutdown', () => { this.ready = false; });
   }
 
-  updateHUD(fighters, roundWins, round, delta) {
+  updateHUD(fighters, roundWins, round, delta, clockMs) {
     if (!this.ready) return;
-    this.hud.update(fighters, roundWins, round, delta);
+    this.hud.update(fighters, roundWins, round, delta, clockMs);
+  }
+
+  // A short word for a moment of skill (PARRY, COUNTER, GUARD BREAK), on
+  // the side of the player who earned it.
+  callout(playerIndex, word, color) {
+    const left = playerIndex === 0;
+    const x = left ? 48 : GAME_WIDTH - 48;
+    const text = this.add.text(x + (left ? -60 : 60), 250, word, displayText(26, {
+      weight: '900', spacing: 8, color, stroke: '#0a0908', strokeThickness: 6,
+    })).setOrigin(left ? 0 : 1, 0.5).setDepth(72).setAlpha(0);
+    const rule = this.add.rectangle(x, 270, 150, 2, PALETTE.gold).setOrigin(left ? 0 : 1, 0.5).setDepth(72).setScale(0, 1);
+    this.tweens.add({ targets: text, x, alpha: 1, duration: 140, ease: 'Expo.easeOut' });
+    this.tweens.add({ targets: rule, scaleX: 1, duration: 200, ease: 'Expo.easeOut' });
+    this.tweens.add({
+      targets: [text, rule], alpha: 0, delay: 750, duration: 250,
+      onComplete: () => { text.destroy(); rule.destroy(); },
+    });
   }
 
   // A black band sweeps open across the screen and holds the message.

@@ -67,10 +67,15 @@ Three stats with slight variation per warrior (not dramatic, ~15-20% range):
 ## Combat System
 
 ### Basic Moves (shared by all warriors)
-- **Light Attack** — Fast, low damage, short recovery
-- **Heavy Attack** — Slow, high damage, longer recovery (punishable if missed)
-- **Block** — Reduces incoming damage, can be broken by heavy attacks
-- **Special Move** — Unique per warrior, activated when special meter is full
+- **Light Attack** — Fast, low damage. Tapped three times it chains: two cuts and a finisher that knocks down
+- **Heavy Attack** — Slow, high damage, longer recovery (punishable if missed); does heavy guard damage
+- **Block** — Blocked hits deal chip damage and wear down the guard gauge (the line under the health bar). An empty gauge is a guard break: the defender is stunned
+- **Parry** — Raising the guard within `PARRY_WINDOW` ms of a blow landing negates it and staggers the attacker
+- **Dash** — Double-tap a direction. A back-dash is briefly invulnerable
+- **Special Move** — Activated when the special meter is full: an unblockable charging strike that knocks down. A clean hit can be cancelled into it
+- Thrusting weapons (iklwa, rapier) use stabbing animations for the same moves; reach scales with weapon length
+
+Frame data for every move lives in `src/config/moves.js`; global rules (health, guard, parry window, round clock) in `src/config/constants.js`. Combos are bounded: hitstun decays per hit and the fifth hit of any combo knocks down. Hitting an opponent during their own swing is a counter (bonus damage). Rounds run on a 60-second clock; on time-out the higher health percentage wins, and a level round is replayed.
 
 ### Special Meter
 - Fills by dealing damage (rewards aggressive play)

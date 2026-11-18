@@ -11,12 +11,17 @@ import { fadeIn, transitionTo } from '../ui/theme.js';
 import { getWarriorById } from '../config/warriors.js';
 import {
   GAME_WIDTH,
-  GAME_HEIGHT,
   GROUND_Y,
+  FIGHTER_SCALE,
   ROUNDS_TO_WIN,
   ROUND_START_DELAY,
   ROUND_END_DELAY,
+  ROUND_SECONDS,
 } from '../config/constants.js';
+
+const S = FIGHTER_SCALE;
+const START_X = [370, GAME_WIDTH - 370];
+const NO_INPUT = Object.freeze({});
 
 export class FightScene extends Phaser.Scene {
   constructor() {
@@ -41,16 +46,24 @@ export class FightScene extends Phaser.Scene {
     this.slowmo = 1;
 
     // Set world bounds
-    this.physics.world.setBounds(30, 0, GAME_WIDTH - 60, GROUND_Y);
+    this.physics.world.setBounds(36, 0, GAME_WIDTH - 72, GROUND_Y);
 
     // Create fighters
     const w1Config = getWarriorById(warrior1Id);
     const w2Config = getWarriorById(warrior2Id);
 
-    this.fighter1 = new Fighter(this, 300, GROUND_Y, w1Config, 0, true);
-    this.fighter2 = new Fighter(this, GAME_WIDTH - 300, GROUND_Y, w2Config, 1, false);
+    // Fighters are lit by the arena they stand in.
+    const lighting = this.arenaRenderer.getFighterLighting();
+    this.fighter1 = new Fighter(this, START_X[0], GROUND_Y, w1Config, 0, true, lighting);
+    this.fighter2 = new Fighter(this, START_X[1], GROUND_Y, w2Config, 1, false, lighting);
+    this.fighter1.opponent = this.fighter2;
+    this.fighter2.opponent = this.fighter1;
 
-    // Input
+    // Input. Scene instances are reused between matches, so clear whichever
+    // controller the last match left on player two.
+    this.input2 = null;
+    this.aiController = null;
+    this.replayRound = false;
     this.input1 = new InputManager(this, 0);
     if (mode === '2p') {
       this.input2 = new InputManager(this, 1);
@@ -87,6 +100,8 @@ export class FightScene extends Phaser.Scene {
     this.roundState = 'starting'; // starting, fighting, roundEnd, matchEnd
     this.roundTimer = ROUND_START_DELAY;
     this.roundTime = 0;
+    this.matchTime = 0;
+    this.roundClock = ROUND_SECONDS * 1000;
 
     // Wait a frame for the HUD scene to come up before announcing.
     this.time.delayedCall(60, () => this.hudScene.announceRound(this.currentRound));
@@ -116,7 +131,7 @@ export class FightScene extends Phaser.Scene {
         break;
 
       case 'fighting':
-        this.updateFighting(time, delta);
+        this.updateFighting(time, simDelta);
         break;
 
       case 'roundEnd':
@@ -128,6 +143,9 @@ export class FightScene extends Phaser.Scene {
           this.fighter1.draw();
           this.fighter2.draw();
         } else {
+          // Nobody is at the controls any more: let go of walk and guard.
+          this.fighter1.handleInput(NO_INPUT);
+          this.fighter2.handleInput(NO_INPUT);
           this.fighter1.update(time, simDelta);
           this.fighter2.update(time, simDelta);
         }
@@ -138,7 +156,7 @@ export class FightScene extends Phaser.Scene {
         break;
     }
 
-    this.hudScene?.updateHUD?.([this.fighter1, this.fighter2], this.roundWins, this.currentRound, delta);
+    this.hudScene?.updateHUD?.([this.fighter1, this.fighter2], this.roundWins, this.currentRound, delta, this.roundClock);
 
     this.drawDebugOverlay();
   }
@@ -154,84 +172,74 @@ export class FightScene extends Phaser.Scene {
   }
 
   updateFighting(time, delta) {
-    // Process input for player 1
-    const p1Input = this.input1.getInput();
-    this.fighter1.handleInput(p1Input);
-    this.fighter1.handleInputRelease(p1Input);
-
-    // Process input for player 2 (human or AI)
+    this.fighter1.handleInput(this.input1.getInput());
     if (this.input2) {
-      const p2Input = this.input2.getInput();
-      this.fighter2.handleInput(p2Input);
-      this.fighter2.handleInputRelease(p2Input);
+      this.fighter2.handleInput(this.input2.getInput());
     } else {
-      const aiState = {
+      this.fighter2.handleInput(this.aiController.getInput({
         self: this.fighter2,
         opponent: this.fighter1,
         distance: Math.abs(this.fighter1.x - this.fighter2.x),
-        opponentAttacking: this.fighter1.isAttacking(),
         delta,
-      };
-      const aiInput = this.aiController.getInput(aiState);
-      this.fighter2.handleInput(aiInput);
-      this.fighter2.handleInputRelease(aiInput);
+      }));
     }
 
     // Combat hit detection (may trigger hitstop)
     const paused = this.combatManager.update(this.fighter1, this.fighter2, delta);
 
-    // Update fighters (skip during hitstop)
     if (!paused) {
       this.fighter1.update(time, delta);
       this.fighter2.update(time, delta);
+      this.roundClock = Math.max(0, this.roundClock - delta);
     } else {
       // Still draw during hitstop
       this.fighter1.draw();
       this.fighter2.draw();
     }
 
-    // Auto-face opponent
-    if (this.fighter1.isActionable()) {
-      this.fighter1.facingRight = this.fighter2.x > this.fighter1.x;
-    }
-    if (this.fighter2.isActionable()) {
-      this.fighter2.facingRight = this.fighter1.x > this.fighter2.x;
-    }
-
-    // Track round time
     this.roundTime += delta;
+    this.matchTime += delta;
 
-    // Check for round end
     if (!this.fighter1.isAlive() || !this.fighter2.isAlive()) {
-      this.endRound();
+      this.endRound(this.fighter1.isAlive() ? 0 : 1, true);
+    } else if (this.roundClock <= 0) {
+      // Time: whoever kept more of their health takes the round.
+      const r1 = this.fighter1.hp / this.fighter1.maxHp;
+      const r2 = this.fighter2.hp / this.fighter2.maxHp;
+      this.endRound(r1 === r2 ? null : r1 > r2 ? 0 : 1, false);
     }
   }
 
-  endRound() {
-    const winner = this.fighter1.isAlive() ? 0 : 1;
+  // winner: 0 | 1, or null for a drawn (timed-out, level) round.
+  endRound(winner, byKnockout) {
+    if (winner === null) {
+      this.roundState = 'roundEnd';
+      this.roundTimer = ROUND_END_DELAY;
+      this.replayRound = true; // a drawn round is fought again
+      this.hudScene.slam('DRAW', '#e9e2d0', 110, 900);
+      return;
+    }
     this.roundWins[winner]++;
 
     const winnerFighter = winner === 0 ? this.fighter1 : this.fighter2;
     const loserFighter = winner === 0 ? this.fighter2 : this.fighter1;
     const winnerConfig = winner === 0 ? this.w1Config : this.w2Config;
     const flawless = winnerFighter.hp >= winnerFighter.maxHp;
+    const matchOver = this.roundWins[winner] >= ROUNDS_TO_WIN;
 
-    this.playKnockout(loserFighter);
+    if (byKnockout) this.playKnockout(loserFighter);
+    else this.hudScene.slam('TIME', '#e9e2d0', 120, 900);
 
-    if (this.roundWins[winner] >= ROUNDS_TO_WIN) {
-      this.roundState = 'matchEnd';
-      this.roundTimer = ROUND_END_DELAY + 2600;
-      this.time.delayedCall(900, () => winnerFighter.enterState('victory'));
-      loserFighter.enterState('defeated');
+    this.roundState = matchOver ? 'matchEnd' : 'roundEnd';
+    this.roundTimer = ROUND_END_DELAY + (matchOver ? 2600 : 1400);
+    this.time.delayedCall(900, () => winnerFighter.isAlive() && winnerFighter.enterState('victory'));
+    if (matchOver) {
       this.hudScene.announceVictory(winnerConfig.name, winner, flawless);
       this.time.delayedCall(1400, () => {
         SoundManager.playCombat(this, 'victory');
-        this.cameraRig.focus(winnerFighter.x, winnerFighter.y - 90, 1.8, 2600);
+        this.cameraRig.follow(winnerFighter, -70 * S, 1.3, 2600);
       });
     } else {
-      this.roundState = 'roundEnd';
-      this.roundTimer = ROUND_END_DELAY + 1400;
-      this.time.delayedCall(900, () => winnerFighter.enterState('victory'));
       this.hudScene.announceRoundWinner(winnerConfig.name, this.currentRound);
     }
   }
@@ -240,7 +248,7 @@ export class FightScene extends Phaser.Scene {
   // camera closes on the fallen, then colour and time return.
   playKnockout(loser) {
     this.hudScene.announceKO();
-    this.cameraRig.focus(loser.x, loser.y - 70, 1.75, 1300);
+    this.cameraRig.follow(loser, -55 * S, 1.3, 1300);
     this.setSlowmo(0.25);
     this.tweenGrade(1, 160);
     this.arenaRenderer.setDim(0.35, 160);
@@ -255,12 +263,15 @@ export class FightScene extends Phaser.Scene {
     const config = fighter === this.fighter1 ? this.w1Config : this.w2Config;
     this.hudScene.announceSpecial(config.special.name, fighter.playerIndex);
     this.arenaRenderer.setDim(0.6, 120);
-    this.cameraRig.focus(fighter.x, fighter.y - 80, 1.7, 420);
+    this.cameraRig.focus(fighter.x + fighter.dir * 60 * S, fighter.y - 65 * S, 1.22, 380);
     this.cameras.main.flash(90, 255, 220, 160);
-    const burst = this.add.image(fighter.x, fighter.y - 60, 'fx_ring').setDepth(11)
-      .setBlendMode(Phaser.BlendModes.ADD).setTint(fighter.profile.fx.specialGlow).setScale(0.3);
-    this.tweens.add({ targets: burst, scale: 3.2, alpha: 0, duration: 500, ease: 'Cubic.easeOut', onComplete: () => burst.destroy() });
-    this.time.delayedCall(620, () => this.arenaRenderer.setDim(0, 300));
+    const burst = this.add.image(fighter.x, fighter.y - 60 * S, 'fx_ring').setDepth(11)
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(fighter.profile.fx.specialGlow).setScale(0.3 * S);
+    this.tweens.add({ targets: burst, scale: 3.2 * S, alpha: 0, duration: 500, ease: 'Cubic.easeOut', onComplete: () => burst.destroy() });
+    // The wind-up hangs in the air for a beat before the dash.
+    this.setSlowmo(0.45);
+    this.time.delayedCall(260, () => { if (this.roundState === 'fighting') this.setSlowmo(1); });
+    this.time.delayedCall(700, () => this.arenaRenderer.setDim(0, 300));
   }
 
   setSlowmo(factor) {
@@ -284,16 +295,18 @@ export class FightScene extends Phaser.Scene {
   }
 
   startNextRound() {
-    this.currentRound++;
+    if (!this.replayRound) this.currentRound++;
+    this.replayRound = false;
     this.roundState = 'starting';
     this.roundTimer = ROUND_START_DELAY;
     this.roundTime = 0;
+    this.roundClock = ROUND_SECONDS * 1000;
     this.setSlowmo(1);
     this.cameraRig.reset();
 
     // Reset fighters for new round
-    this.fighter1.resetForRound(300, true);
-    this.fighter2.resetForRound(GAME_WIDTH - 300, false);
+    this.fighter1.resetForRound(START_X[0], true);
+    this.fighter2.resetForRound(START_X[1], false);
     this.hudScene.hud?.resetRound();
 
     if (this.aiController) {
@@ -312,7 +325,7 @@ export class FightScene extends Phaser.Scene {
       winnerName: winnerConfig.name,
       roundWins: this.roundWins,
       stats: [this.fighter1.stats, this.fighter2.stats],
-      roundTime: this.roundTime,
+      roundTime: this.matchTime,
       matchData: this.matchData,
     });
   }
@@ -321,18 +334,33 @@ export class FightScene extends Phaser.Scene {
     this.hudScene.showCombo(playerIndex, count);
   }
 
+  onParry(playerIndex) {
+    this.hudScene.callout(playerIndex, 'PARRY', '#bfe4ff');
+    // A parry is a held breath: the world slows while the opening exists.
+    this.setSlowmo(0.4);
+    this.time.delayedCall(240, () => { if (this.roundState === 'fighting') this.setSlowmo(1); });
+  }
+
+  onGuardBreak(playerIndex) {
+    this.hudScene.callout(playerIndex, 'GUARD BREAK', '#e8c56a');
+  }
+
+  onCounter(playerIndex) {
+    this.hudScene.callout(playerIndex, 'COUNTER', '#e0283f');
+  }
+
   cleanUp() {
     // The physics world is already torn down by now and is rebuilt (at
     // normal time scale) on the next start, so slow-mo needs no reset here.
     this.scene.stop('FightHUD');
     this.events.off('fighter-special', this.onSpecial, this);
     this.events.off('fighter-front');
+    this.combatManager?.destroy();
     this.arenaRenderer?.destroy();
     this.fighter1?.destroy();
     this.fighter2?.destroy();
     this.input1?.destroy();
     this.input2?.destroy();
-    this.combatManager?.destroy();
     this.debugOverlay?.destroy();
   }
 }

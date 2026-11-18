@@ -44,8 +44,19 @@ const SLOT_Z = {
   weapon: 9,
 };
 
-const BACK_LIMB_ALPHA = 0.72;
-const BACK_LIMB_TINT = 0x9a9590;
+// Far-side limbs sit in shade (opaque: a translucent limb shows the arena
+// through it).
+const BACK_LIMB_SHADE = 0x8d8883;
+// Rim light: a tint-filled copy of every part, nudged up and away from the
+// way the fighter faces and drawn behind the rig, so only a sliver shows
+// along the lit edge of the silhouette.
+const RIM_OFFSET = { x: -0.7, y: -1.1 };
+const RIM_ALPHA = 0.7;
+
+function multiplyColor(a, b) {
+  const ch = shift => Math.round((((a >> shift) & 0xff) * ((b >> shift) & 0xff)) / 255);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
 // Number of motion samples kept for the weapon ribbon. At 60fps this is
 // ~130ms of swing, long enough to read as an arc without lagging the blade.
 const TRAIL_SAMPLES = 8;
@@ -68,6 +79,10 @@ export class AssetWarriorRenderer {
     this.groundY = options.groundY ?? GROUND_Y;
     this.shadowDepth = options.shadowDepth;
     this.trailHistory = [];
+    this.frontTint = options.ambient ?? 0xffffff;
+    this.backTint = multiplyColor(this.frontTint, BACK_LIMB_SHADE);
+    this.rimColor = options.rimColor ?? null;
+    this.rims = {};
 
     for (const [slot, spriteName] of Object.entries(SLOT_TO_SPRITE)) {
       const textureKey = `warrior_${warriorConfig.id}_${spriteName}`;
@@ -78,19 +93,23 @@ export class AssetWarriorRenderer {
       const image = scene.add.image(0, 0, textureKey);
 
       const cropTop = this.rig[spriteName].cropTop || 0;
-      if (slot.endsWith('_foot')) {
-        image.setCrop(0, image.height * 0.77, image.width, image.height * 0.23);
-      } else if (slot.endsWith('leg_lower')) {
-        image.setCrop(0, image.height * cropTop, image.width, image.height * (0.87 - cropTop));
-      } else if (cropTop) image.setCrop(0, image.height * cropTop, image.width, image.height * (1 - cropTop));
+      let crop = null;
+      if (slot.endsWith('_foot')) crop = [0, image.height * 0.77, image.width, image.height * 0.23];
+      else if (slot.endsWith('leg_lower')) crop = [0, image.height * cropTop, image.width, image.height * (0.87 - cropTop)];
+      else if (cropTop) crop = [0, image.height * cropTop, image.width, image.height * (1 - cropTop)];
+      if (crop) image.setCrop(...crop);
 
-      if (slot.startsWith('back_')) {
-        // Push back limbs into shade so the silhouette reads in depth.
-        image.setAlpha(BACK_LIMB_ALPHA);
-        image.setTint(BACK_LIMB_TINT);
-      }
+      // Push back limbs into shade so the silhouette reads in depth.
+      image.setTint(slot.startsWith('back_') ? this.backTint : this.frontTint);
       image.setVisible(false);
       this.parts[slot] = image;
+
+      if (this.rimColor !== null) {
+        const rim = scene.add.image(0, 0, textureKey).setTintFill(this.rimColor)
+          .setAlpha(RIM_ALPHA * (slot.startsWith('back_') ? 0.5 : 1)).setVisible(false);
+        if (crop) rim.setCrop(...crop);
+        this.rims[slot] = rim;
+      }
     }
 
     this.faceGraphics = scene.add.graphics();
@@ -110,6 +129,7 @@ export class AssetWarriorRenderer {
     this.depthBase = base;
     for (const [slot, img] of Object.entries(this.parts)) {
       img.setDepth(base + SLOT_Z[slot] * 0.01);
+      this.rims[slot]?.setDepth(base - 0.05);
     }
     this.faceGraphics.setDepth(base + 0.065);
     this.shadowGraphics.setDepth(this.shadowDepth ?? base - 0.3);
@@ -120,6 +140,7 @@ export class AssetWarriorRenderer {
 
   setVisible(visible) {
     for (const img of Object.values(this.parts)) img.setVisible(visible);
+    for (const rim of Object.values(this.rims)) rim.setVisible(visible);
     this.faceGraphics.setVisible(visible);
     this.shadowGraphics.setVisible(visible);
     this.trailGraphics.setVisible(visible);
@@ -129,7 +150,8 @@ export class AssetWarriorRenderer {
 
   setAlpha(alpha) {
     for (const [slot, img] of Object.entries(this.parts)) {
-      img.setAlpha(alpha * (slot.startsWith('back_') ? BACK_LIMB_ALPHA : 1));
+      img.setAlpha(alpha);
+      this.rims[slot]?.setAlpha(alpha * RIM_ALPHA * (slot.startsWith('back_') ? 0.5 : 1));
     }
     this.faceGraphics.setAlpha(alpha);
     this.shadowGraphics.setAlpha(alpha);
@@ -145,7 +167,7 @@ export class AssetWarriorRenderer {
     this.flashColor = color;
     for (const [slot, img] of Object.entries(this.parts)) {
       if (on) img.setTintFill(color);
-      else img.setTint(slot.startsWith('back_') ? BACK_LIMB_TINT : 0xffffff);
+      else img.setTint(slot.startsWith('back_') ? this.backTint : this.frontTint);
     }
   }
 
@@ -173,8 +195,15 @@ export class AssetWarriorRenderer {
     this.#foot('front_foot', rig.frontLeg, !facingRight);
     this.#foot('back_foot', rig.backLeg, !facingRight);
     this.#bone('weapon', { x: geom.handX, y: geom.handY }, { x: geom.tipX, y: geom.tipY }, !facingRight);
-    this.#head(rig.neck, rig.torsoAngle * 0.3, scale, dir);
-    for (const img of Object.values(this.parts)) img.setVisible(true);
+    this.#head(rig.neck, rig.headAngle, scale, dir);
+    const rimX = RIM_OFFSET.x * dir * this.displayScale;
+    const rimY = RIM_OFFSET.y * this.displayScale;
+    for (const [slot, img] of Object.entries(this.parts)) {
+      img.setVisible(true);
+      this.rims[slot]?.setOrigin(img.originX, img.originY).setFlipX(img.flipX)
+        .setPosition(img.x + rimX, img.y + rimY).setRotation(img.rotation)
+        .setScale(img.scaleX, img.scaleY).setVisible(true);
+    }
 
     this.#drawShadow(x, baseY);
     this.#drawAura(x, baseY, pose, specialRatio);
@@ -217,26 +246,70 @@ export class AssetWarriorRenderer {
     const data = this.rig.head;
     const g = this.faceGraphics;
     g.clear().setPosition(neck.x, neck.y).setRotation(rotation).setScale(scale * dir, scale);
-    if (data.face) {
-      // The supplied open headgear contains no face. Give it a connected neck
-      // and a restrained profile underneath; the existing hat stays on top.
-      const skin = this.flashing ? this.flashColor : parseInt(this.config.colors.skin.slice(1), 16);
-      g.fillStyle(skin, 1).lineStyle(0.8, 0x241d19, 1);
-      g.fillRect(-3, -7, 7, 10);
-      g.beginPath();
-      const crown = data.brow ? -20 : -14;
-      g.moveTo(-6, crown); g.lineTo(4, crown - 1); g.lineTo(8, crown + 3);
-      g.lineTo(8, -12); g.lineTo(11, -9); g.lineTo(8, -8);
-      g.lineTo(7, -3); g.lineTo(2, -1); g.lineTo(-5, -6);
-      g.closePath(); g.fillPath(); g.strokePath();
-      g.fillStyle(0x241d19, 1); g.fillEllipse(6, -13, 2, 1.2);
-      g.lineStyle(0.7, 0x5a3525, 1); g.lineBetween(5, -5, 8, -5);
-    }
+    if (data.face) this.#drawFace(g, data);
     const offset = data.brow ? -17 : 0;
     head.setOrigin(dir < 0 ? 1 - data.origin[0] : data.origin[0], data.origin[1])
       .setFlipX(dir < 0).setScale(data.height / head.height * scale)
       .setRotation(rotation)
       .setPosition(neck.x - Math.sin(rotation) * offset * scale, neck.y + Math.cos(rotation) * offset * scale);
+  }
+
+  // Open headgear ships without a face. Draw a profile under it: skull,
+  // brow, nose, lips and jaw, an eye, an ear, a shaded jawline and whatever
+  // facial hair the warrior wears. The hat sprite sits on top.
+  #drawFace(g, data) {
+    const lit = c => multiplyColor(c, this.frontTint);
+    const skinBase = parseInt(this.config.colors.skin.slice(1), 16);
+    const flat = this.flashing ? this.flashColor : null;
+    const skin = flat ?? lit(skinBase);
+    const shade = flat ?? lit(multiplyColor(skinBase, 0xb89a94));
+    const ink = flat ?? 0x241d19;
+    const hair = flat ?? lit(data.hair ?? 0x2a1d16);
+    const top = data.brow ? -20 : -14.5;
+
+    // Neck.
+    g.fillStyle(shade, 1).fillRect(-3.4, -7, 7.4, 10);
+    g.lineStyle(0.7, ink, 1).lineBetween(-3.4, -6, -3.4, 3).lineBetween(4, -2, 4, 3);
+
+    // Skull and profile.
+    const outline = [
+      [-7, top + 3], [-4, top], [2, top - 1], [6.5, top + 1],
+      [8.4, -15.2], [8.3, -13.4], [11.4, -10.4], [9.2, -9.4], [9.7, -8.1],
+      [8.7, -7.3], [9.3, -6.2], [8.4, -3.4], [5, -1.4], [0, -2.6], [-3.5, -5.5], [-6.5, -9],
+    ];
+    g.fillStyle(skin, 1).lineStyle(0.8, ink, 1).beginPath();
+    outline.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.closePath().fillPath().strokePath();
+
+    // Shadow under the cheekbone and along the jaw.
+    g.fillStyle(shade, 1).beginPath();
+    g.moveTo(8.2, -3.8); g.lineTo(5, -1.8); g.lineTo(0, -3); g.lineTo(-3.2, -5.6);
+    g.lineTo(1, -6.6); g.lineTo(6.5, -5.4);
+    g.closePath().fillPath();
+
+    // Ear.
+    g.fillStyle(shade, 1).fillEllipse(-0.8, -10.6, 3, 4.4);
+    g.lineStyle(0.6, ink, 0.9).strokeEllipse(-0.8, -10.6, 3, 4.4);
+
+    // Eye, brow, mouth.
+    if (!flat) g.fillStyle(0xf3ead8, 1).fillEllipse(6, -13.2, 3, 1.7);
+    g.fillStyle(ink, 1).fillCircle(6.7, -13.2, 0.8);
+    g.lineStyle(1.1, ink, 1).lineBetween(3.6, -15.3, 8.3, -14.6);
+    g.lineStyle(0.7, ink, 1).lineBetween(6.8, -7.3, 8.7, -7.3);
+
+    if (data.beard === 'full') {
+      g.fillStyle(hair, 1).lineStyle(0.7, ink, 1).beginPath();
+      [[9.3, -9.2], [10, -6.8], [8.8, -2], [6, 2.2], [1.5, 0.4], [-2.6, -4.6], [-1, -8.8], [3.5, -7.4], [6.6, -8.2]]
+        .forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.closePath().fillPath().strokePath();
+    } else if (data.beard === 'goatee') {
+      g.fillStyle(hair, 1).beginPath();
+      g.moveTo(6.4, -5.6); g.lineTo(9.3, -5.4); g.lineTo(8.8, 0.6); g.lineTo(6.2, -2.4);
+      g.closePath().fillPath();
+    }
+    if (data.beard === 'goatee' || data.beard === 'moustache') {
+      g.lineStyle(1.3, hair, 1).lineBetween(6, -8.7, 10.2, -8.3).lineBetween(10.2, -8.3, 10.2, -5.8);
+    }
   }
 
   #drawAura(x, baseY, pose, specialRatio) {
@@ -393,6 +466,8 @@ export class AssetWarriorRenderer {
       img?.destroy();
     }
     this.parts = {};
+    for (const rim of Object.values(this.rims)) rim.destroy();
+    this.rims = {};
     this.faceGraphics?.destroy();
     this.trailGraphics?.destroy();
     this.glowGraphics?.destroy();

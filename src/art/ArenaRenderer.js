@@ -247,6 +247,17 @@ export class ArenaRenderer {
     }
   }
 
+  // How this arena lights a fighter: a multiply tint that pulls their flat
+  // colours toward the plate's cast, and the colour of the back/rim light.
+  getFighterLighting() {
+    const tint = this.mood.grade.tint || [1, 1, 1];
+    const channel = c => Math.round(255 * Math.min(1, (1 + (c - 1) * 0.7) * 0.9));
+    return {
+      ambient: (channel(tint[0]) << 16) | (channel(tint[1]) << 8) | channel(tint[2]),
+      rimColor: this.mood.light,
+    };
+  }
+
   // 0 = the arena's mood grade, 1 = fully drained to monochrome.
   setDrain(k) {
     this.drainPlate?.setAlpha(k);

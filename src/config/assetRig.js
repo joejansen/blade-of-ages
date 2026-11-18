@@ -16,13 +16,13 @@ const COMMON = {
 const HEADS = {
   knight: { origin: [0.5, 0.86], height: 29 },
   samurai: { origin: [0.55, 0.84], height: 32, cropTop: 0.15 },
-  viking: { origin: [0.54, 0.85], height: 29, cropTop: 0.16, face: true },
+  viking: { origin: [0.54, 0.85], height: 29, cropTop: 0.16, face: true, beard: 'full', hair: 0xa8552a },
   gladiator: { origin: [0.58, 0.84], height: 35 },
-  mongol: { origin: [0.5, 0.51], height: 32, cropTop: 0.09, face: true, brow: true },
+  mongol: { origin: [0.5, 0.51], height: 32, cropTop: 0.09, face: true, brow: true, beard: 'moustache', hair: 0x1c1512 },
   spartan: { origin: [0.58, 0.7], height: 37, cropTop: 0.07 },
-  pirate: { origin: [0.55, 0.45], height: 29, cropTop: 0.11, face: true, brow: true },
+  pirate: { origin: [0.55, 0.45], height: 29, cropTop: 0.11, face: true, brow: true, beard: 'full', hair: 0x2b1c14 },
   zulu: { origin: [0.5, 0.76], height: 38, face: true, brow: true },
-  conquistador: { origin: [0.52, 0.66], height: 28, cropTop: 0.15, face: true, brow: true },
+  conquistador: { origin: [0.52, 0.66], height: 28, cropTop: 0.15, face: true, brow: true, beard: 'goatee', hair: 0x2a1a12 },
   seal: { origin: [0.57, 0.91], height: 28, cropTop: 0.27 },
 };
 const OVERRIDES = {

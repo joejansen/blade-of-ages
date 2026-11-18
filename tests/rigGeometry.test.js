@@ -6,7 +6,10 @@ import { getAssetRig } from '../src/config/assetRig.js';
 import { sampleAnimationPose, blendPose } from '../src/fighters/animationClips.js';
 import { RIG, computeRigGeometry, partTransform, solveLimb } from '../src/fighters/rigGeometry.js';
 
-const states = ['idle', 'walking', 'jumping', 'crouching', 'lightAttack', 'heavyAttack', 'special', 'blocking', 'hit', 'defeated', 'victory'];
+const states = [
+  'idle', 'walking', 'jumping', 'crouching', 'lightAttack', 'heavyAttack', 'special', 'blocking', 'hit', 'defeated', 'victory',
+  'light2', 'light3', 'airAttack', 'hitHeavy', 'stunned', 'getup', 'dash', 'backdash',
+];
 const near = (a, b, message) => assert.ok(Math.abs(a - b) < 1e-7, `${message}: ${a} != ${b}`);
 const length = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 

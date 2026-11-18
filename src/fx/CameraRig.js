@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, GROUND_Y } from '../config/constants.js';
+import { GAME_WIDTH, GAME_HEIGHT, GROUND_Y, FIGHTER_SCALE } from '../config/constants.js';
 
+// The painted plates are 1280 wide, so the push-in stays modest: the
+// fighters' own size carries the frame, not magnification.
 const MIN_ZOOM = 1;
-const MAX_ZOOM = 1.6;
-const MARGIN_X = 130;
-const HEAD_ROOM = 190;
+const MAX_ZOOM = 1.16;
+const MARGIN_X = 130 * FIGHTER_SCALE;
+const HEAD_ROOM = 150 * FIGHTER_SCALE;
 const FLOOR_ROOM = 90;
 
 // Frames both fighters: pushes in when they close distance, pulls out when
@@ -24,12 +26,17 @@ export class CameraRig {
 
   // Zoom impulse; decays exponentially.
   punch(amount) {
-    this.punchAmount = Math.min(0.16, this.punchAmount + amount);
+    this.punchAmount = Math.min(0.1, this.punchAmount + amount);
   }
 
   // Hold the frame on a point for `duration` ms.
   focus(x, y, zoom, duration) {
     this.override = { x, y, zoom, remaining: duration };
+  }
+
+  // Hold the frame on a fighter, following them, for `duration` ms.
+  follow(fighter, offsetY, zoom, duration) {
+    this.override = { fighter, offsetY, zoom, remaining: duration };
   }
 
   release() {
@@ -47,7 +54,11 @@ export class CameraRig {
       if (this.override.remaining <= 0) this.override = null;
     }
 
-    if (this.override) {
+    if (this.override?.fighter) {
+      tx = this.override.fighter.x;
+      ty = GROUND_Y + this.override.offsetY;
+      targetZoom = this.override.zoom;
+    } else if (this.override) {
       ({ x: tx, y: ty, zoom: targetZoom } = this.override);
     } else {
       const minX = Math.min(f1.x, f2.x) - MARGIN_X;
