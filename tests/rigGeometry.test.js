@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import { FIGHTER_PROFILES } from '../src/config/fighterProfiles.js';
 import { getAssetRig } from '../src/config/assetRig.js';
+import { isVectorWarrior } from '../src/art/vector/index.js';
 import { sampleAnimationPose, blendPose } from '../src/fighters/animationClips.js';
 import { RIG, computeRigGeometry, partTransform, solveLimb } from '../src/fighters/rigGeometry.js';
 
@@ -64,10 +65,17 @@ for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) {
   });
 }
 
-test('axe is held on its lower grip; swords on their upper grips', () => {
-  assert.ok(getAssetRig('viking').weapon.start[1] > getAssetRig('viking').weapon.end[1]);
-  for (const id of ['knight', 'samurai', 'pirate', 'conquistador', 'zulu']) {
-    assert.ok(getAssetRig(id).weapon.start[1] < getAssetRig(id).weapon.end[1]);
+test('weapons drawn in code run tip-up from the grip; PNG weapons keep their measured grips', () => {
+  for (const id of Object.keys(FIGHTER_PROFILES)) {
+    const { start, end } = getAssetRig(id).weapon;
+    if (isVectorWarrior(id)) {
+      assert.ok(start[1] > end[1], `${id}: tip above grip`);
+      assert.ok(start[1] < 1 && end[1] > 0, `${id}: grip and tip inside the texture`);
+    } else if (id === 'viking') {
+      assert.ok(start[1] > end[1], 'PNG axe is held on its lower grip');
+    } else if (['knight', 'samurai', 'pirate', 'conquistador', 'zulu'].includes(id)) {
+      assert.ok(start[1] < end[1], `${id}: PNG sword is held on its upper grip`);
+    }
   }
 });
 

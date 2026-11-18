@@ -53,6 +53,8 @@ const BACK_LIMB_SHADE = 0x8d8883;
 // along the lit edge of the silhouette.
 const RIM_OFFSET = { x: -0.7, y: -1.1 };
 const RIM_ALPHA = 0.55;
+// How far ahead of the off hand a shield is held, in rig units.
+const SHIELD_REACH = 7;
 
 function multiplyColor(a, b) {
   const ch = shift => Math.round((((a >> shift) & 0xff) * ((b >> shift) & 0xff)) / 255);
@@ -203,7 +205,9 @@ export class AssetWarriorRenderer {
     }
     this.#foot('front_foot', rig.frontLeg, !facingRight, scale);
     this.#foot('back_foot', rig.backLeg, !facingRight, scale);
-    this.#held('back_shield', rig.backArm.end, rig.torsoAngle * 0.6, !facingRight, scale);
+    // The shield is carried ahead of the off hand so it shows past the body.
+    const shieldAt = { x: rig.backArm.end.x + SHIELD_REACH * dir * scale, y: rig.backArm.end.y };
+    this.#held('back_shield', shieldAt, rig.torsoAngle * 0.6, !facingRight, scale);
     this.#bone('weapon', { x: geom.handX, y: geom.handY }, { x: geom.tipX, y: geom.tipY }, !facingRight);
     this.#head(rig.neck, rig.headAngle, scale, dir);
     const rimX = RIM_OFFSET.x * dir * this.displayScale;

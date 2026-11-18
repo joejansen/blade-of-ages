@@ -1,5 +1,18 @@
 # Blade of Ages Art Pipeline
 
+## Current state: fighters are drawn in code
+
+All ten warriors are now hand-authored vector art, not generated PNG parts.
+
+- `src/art/vector/kit.js` — the ink-and-cel drawing kit (shaded outlined forms, detail strokes, bands, glints, glows) and per-warrior mood (shadow depth, light offset).
+- `src/art/vector/anatomy.js` — the shared figure: body outlines, the standard frame each part is drawn in, a profile face for open helmets, scars, scratches, rivets.
+- `src/art/vector/<id>.js` — one warrior: palette, the seven body parts, an optional off-hand `shield`, and a `weapon(length)` drawn tip-up from the grip with its edge on +x.
+- `src/art/vector/index.js` — registry. Parts are baked to canvas textures at boot under the sprite renderer's keys, and landmarks come straight from the definitions, so nothing needs calibrating. `HEROIC_RIG` holds the proportions every fighter stands on.
+
+To change a warrior, edit its file and run `node tests/vectorCheck.js <id> <weaponLength>` (or `npm test`): it executes every draw function and fails if anything falls outside its box, where it would be clipped. Then look at it in the game; the check cannot judge how it reads.
+
+The PNG parts under `public/assets/warriors/` and the generation workflow below are no longer used at runtime. They are kept for reference.
+
 ## Goal
 
 Ship fighters that feel coherent, readable, and alive in motion.

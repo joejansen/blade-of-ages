@@ -120,3 +120,19 @@ export function scratch(ctx, x0, y0, x1, y1, hi = '#d2ab5c') {
 export function rivet(ctx, x, y, r = 0.5, color = '#d2ab5c') {
   disc(ctx, x, y, r, color, { line: 0.35 });
 }
+
+// Edge of a tapering form at height y: `table` is a list of [y, x] pairs
+// (or a constant), interpolated linearly. Used to lay rows of mail or
+// lamellae across a limb whose width changes.
+export function at(table, y) {
+  if (typeof table === 'number') return table;
+  if (y <= table[0][0]) return table[0][1];
+  for (let i = 1; i < table.length; i++) {
+    const [y1, x1] = table[i];
+    if (y <= y1) {
+      const [y0, x0] = table[i - 1];
+      return x0 + ((x1 - x0) * (y - y0)) / (y1 - y0);
+    }
+  }
+  return table[table.length - 1][1];
+}
