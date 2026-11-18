@@ -7,6 +7,7 @@ import {
   transitionTo, fadeIn, addKeyHint,
 } from '../ui/theme.js';
 import { Showcase } from '../ui/Showcase.js';
+import { bindMenuInput } from '../input/menuInput.js';
 
 const PANEL_W = 400;
 const PANEL_H = 430;
@@ -23,7 +24,7 @@ const MODES = [
     id: '2p',
     numeral: 'II',
     title: 'DUAL WARRIORS',
-    body: 'Two blades, one keyboard.\nSettle it in person.',
+    body: 'Two blades, one screen.\nSettle it in person.',
   },
 ];
 
@@ -49,12 +50,17 @@ export class ModeSelectScene extends Phaser.Scene {
     this.index = 0;
     this.focus(0, true);
 
-    ['LEFT', 'A'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.focus(0)));
-    ['RIGHT', 'D'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.focus(1)));
-    ['ENTER', 'SPACE'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.choose(this.index)));
-    this.input.keyboard.on('keydown-ESC', () => transitionTo(this, 'Title'));
+    bindMenuInput(this, {
+      left: () => this.focus(0),
+      right: () => this.focus(1),
+      confirm: () => this.choose(this.index),
+      back: () => transitionTo(this, 'Title'),
+    });
 
-    addKeyHint(this, '← →  CHOOSE     ENTER  CONFIRM     ESC  BACK');
+    addKeyHint(this, {
+      keys: '← →  CHOOSE     ENTER  CONFIRM     ESC  BACK',
+      pad: '← →  CHOOSE     ✕  CONFIRM     ○  BACK',
+    });
   }
 
   createPanel(x, mode, index, roster) {

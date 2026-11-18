@@ -1,62 +1,31 @@
 import Phaser from 'phaser';
 import { P1_KEYS, P2_KEYS } from '../config/controls.js';
 import { DASH_TAP_WINDOW } from '../config/constants.js';
+import { gamepads } from '../input/gamepads.js';
+import { FIGHT_ACTIONS, initialFightState, stepFightInput } from '../input/fightInput.js';
 
+// A player's fight input: their keyboard keys merged with their gamepad
+// (pad slot = player index). allPads lets any pad drive this player, for
+// single-player matches.
 export class InputManager {
-  constructor(scene, playerIndex) {
+  constructor(scene, playerIndex, { allPads = false } = {}) {
     this.scene = scene;
     this.playerIndex = playerIndex;
+    this.allPads = allPads;
     const keyMap = playerIndex === 0 ? P1_KEYS : P2_KEYS;
 
     this.keys = {};
     for (const [action, key] of Object.entries(keyMap)) {
       this.keys[action] = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes[key]);
     }
-
-    // Track just-pressed for attacks (prevent holding)
-    this.prevDown = {};
-    for (const action of ['lightAttack', 'heavyAttack', 'special']) {
-      this.prevDown[action] = false;
-    }
-    // Double-tap a direction to dash.
-    this.lastTap = { dir: 0, time: -Infinity };
+    this.state = initialFightState();
   }
 
   getInput() {
-    let dash = 0;
-    for (const [key, dir] of [['left', -1], ['right', 1]]) {
-      if (this.keys[key].isDown && !this.prevDown[key]) {
-        const now = this.scene.time.now;
-        if (this.lastTap.dir === dir && now - this.lastTap.time <= DASH_TAP_WINDOW) {
-          dash = dir;
-          this.lastTap = { dir: 0, time: -Infinity };
-        } else {
-          this.lastTap = { dir, time: now };
-        }
-      }
-    }
-
-    const input = {
-      dash,
-      left: this.keys.left.isDown,
-      right: this.keys.right.isDown,
-      jump: this.keys.jump.isDown && !this.prevDown.jump,
-      crouch: this.keys.crouch.isDown,
-      lightAttack: this.keys.lightAttack.isDown && !this.prevDown.lightAttack,
-      heavyAttack: this.keys.heavyAttack.isDown && !this.prevDown.heavyAttack,
-      block: this.keys.block.isDown,
-      special: this.keys.special.isDown && !this.prevDown.special,
-    };
-
-    // Update previous state
-    this.prevDown.left = this.keys.left.isDown;
-    this.prevDown.right = this.keys.right.isDown;
-    this.prevDown.jump = this.keys.jump.isDown;
-    this.prevDown.lightAttack = this.keys.lightAttack.isDown;
-    this.prevDown.heavyAttack = this.keys.heavyAttack.isDown;
-    this.prevDown.special = this.keys.special.isDown;
-
-    return input;
+    const pad = gamepads.fightHeld(this.playerIndex, this.allPads);
+    const held = {};
+    for (const action of FIGHT_ACTIONS) held[action] = this.keys[action].isDown || Boolean(pad[action]);
+    return stepFightInput(this.state, held, this.scene.time.now, DASH_TAP_WINDOW);
   }
 
   destroy() {

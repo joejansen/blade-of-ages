@@ -94,7 +94,7 @@ export class TitleScene extends Phaser.Scene {
     });
     bindMenuKeys(this, buttons);
 
-    addKeyHint(this, '↑ ↓  CHOOSE     ENTER  CONFIRM');
+    addKeyHint(this, { keys: '↑ ↓  CHOOSE     ENTER  CONFIRM', pad: '↑ ↓  CHOOSE     ✕  CONFIRM' });
     this.add.text(GAME_WIDTH - 28, GAME_HEIGHT - 24, 'v2.0', displayText(10, {
       color: HEX.ashDark, weight: '500', spacing: 2, shadow: false,
     })).setOrigin(1, 1).setDepth(50);

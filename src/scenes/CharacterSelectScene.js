@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindMenuInput } from '../input/menuInput.js';
 import { SoundManager } from '../audio/SoundManager.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
 import { WARRIORS } from '../config/warriors.js';
@@ -58,13 +59,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       const nr = (row + dy + 2) % 2;
       this.moveCursor(nr * COLS + nc);
     };
-    ['LEFT', 'A'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => move(-1, 0)));
-    ['RIGHT', 'D'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => move(1, 0)));
-    ['UP', 'W'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => move(0, -1)));
-    ['DOWN', 'S'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => move(0, 1)));
-    ['ENTER', 'SPACE', 'F'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.confirm(this.cursor)));
-
-    this.input.keyboard.on('keydown-ESC', () => {
+    const back = () => {
       if (this.locked) return;
       if (this.selectingPlayer === 1 && this.mode === '2p') {
         this.selected[0] = null;
@@ -75,9 +70,20 @@ export class CharacterSelectScene extends Phaser.Scene {
       } else {
         transitionTo(this, 'ModeSelect');
       }
-    });
+    };
+    bindMenuInput(this, {
+      left: () => move(-1, 0),
+      right: () => move(1, 0),
+      up: () => move(0, -1),
+      down: () => move(0, 1),
+      confirm: () => this.confirm(this.cursor),
+      back,
+    }, { keys: { confirm: ['F'] } });
 
-    addKeyHint(this, 'ARROWS  MOVE     ENTER  SELECT     ESC  BACK');
+    addKeyHint(this, {
+      keys: 'ARROWS  MOVE     ENTER  SELECT     ESC  BACK',
+      pad: 'D-PAD  MOVE     ✕  SELECT     ○  BACK',
+    });
   }
 
   createTile(warrior, index) {

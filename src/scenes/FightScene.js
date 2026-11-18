@@ -64,7 +64,8 @@ export class FightScene extends Phaser.Scene {
     this.input2 = null;
     this.aiController = null;
     this.replayRound = false;
-    this.input1 = new InputManager(this, 0);
+    // With no second player, any connected pad drives player one.
+    this.input1 = new InputManager(this, 0, { allPads: mode !== '2p' });
     if (mode === '2p') {
       this.input2 = new InputManager(this, 1);
     } else {

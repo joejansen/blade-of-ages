@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindMenuInput } from '../input/menuInput.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
 import { getWarriorById } from '../config/warriors.js';
 import {
@@ -141,8 +142,13 @@ export class ResultScene extends Phaser.Scene {
     });
     bindMenuKeys(this, buttons, { horizontal: true });
 
-    this.input.keyboard.on('keydown-R', rematch);
-    this.input.keyboard.on('keydown-ESC', () => transitionTo(this, 'Title'));
-    addKeyHint(this, '← →  CHOOSE     ENTER  CONFIRM     R  REMATCH     ESC  MENU');
+    bindMenuInput(this, {
+      alt: rematch,
+      back: () => transitionTo(this, 'Title'),
+    }, { keys: { alt: ['R'] } });
+    addKeyHint(this, {
+      keys: '← →  CHOOSE     ENTER  CONFIRM     R  REMATCH     ESC  MENU',
+      pad: '← →  CHOOSE     ✕  CONFIRM     △  REMATCH     ○  MENU',
+    });
   }
 }

@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
 import { SoundManager } from '../audio/SoundManager.js';
+import { gamepads } from '../input/gamepads.js';
+import { bindMenuInput } from '../input/menuInput.js';
 
 // Visual language: "ink and blood". Near-black ground, bone-white type,
 // a single crimson accent for violence/selection, muted gold for honours.
@@ -364,7 +366,7 @@ export function createTextButton(scene, x, y, label, onSelect, opts = {}) {
   return button;
 }
 
-// Keyboard navigation for a vertical or horizontal list of buttons.
+// Keyboard and gamepad navigation for a vertical or horizontal list of buttons.
 export function bindMenuKeys(scene, buttons, opts = {}) {
   let index = opts.initial ?? 0;
   const focus = (i, silent) => {
@@ -375,22 +377,30 @@ export function bindMenuKeys(scene, buttons, opts = {}) {
     b.sticky = true;
     b.hit.on('pointerover', () => { if (index !== i) focus(i); });
   });
-  const prevKeys = opts.horizontal ? ['LEFT', 'A'] : ['UP', 'W'];
-  const nextKeys = opts.horizontal ? ['RIGHT', 'D'] : ['DOWN', 'S'];
-  prevKeys.forEach(k => scene.input.keyboard.on(`keydown-${k}`, () => focus(index - 1)));
-  nextKeys.forEach(k => scene.input.keyboard.on(`keydown-${k}`, () => focus(index + 1)));
-  ['ENTER', 'SPACE'].forEach(k => scene.input.keyboard.on(`keydown-${k}`, () => {
-    SoundManager.playUIClick(scene);
-    buttons[index].select();
-  }));
+  const [prev, next] = opts.horizontal ? ['left', 'right'] : ['up', 'down'];
+  bindMenuInput(scene, {
+    [prev]: () => focus(index - 1),
+    [next]: () => focus(index + 1),
+    confirm: () => {
+      SoundManager.playUIClick(scene);
+      buttons[index].select();
+    },
+  });
   focus(index, true);
   return { focus, get index() { return index; } };
 }
 
-export function addKeyHint(scene, text, y = GAME_HEIGHT - 34) {
-  return scene.add.text(GAME_WIDTH / 2, y, text, displayText(12, {
+// Control hint along the bottom edge. Pass { keys, pad } to show the pad
+// version while a gamepad is the last device used.
+export function addKeyHint(scene, hint, y = GAME_HEIGHT - 34) {
+  const { keys, pad = keys } = typeof hint === 'string' ? { keys: hint } : hint;
+  const pick = () => (gamepads.lastDevice === 'gamepad' ? pad : keys);
+  const text = scene.add.text(GAME_WIDTH / 2, y, pick(), displayText(12, {
     color: HEX.ash, weight: '500', spacing: 4, shadow: false,
   })).setOrigin(0.5).setDepth(50);
+  const off = gamepads.onChange(() => text.setText(pick()));
+  scene.events.once('shutdown', off);
+  return text;
 }
 
 export function hexToInt(hex) {

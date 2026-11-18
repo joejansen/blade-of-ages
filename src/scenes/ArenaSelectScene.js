@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindMenuInput } from '../input/menuInput.js';
 import { SoundManager } from '../audio/SoundManager.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
 import { getWarriorById } from '../config/warriors.js';
@@ -99,12 +100,17 @@ export class ArenaSelectScene extends Phaser.Scene {
 
     this.moveCursor(this.cursor, true);
 
-    ['LEFT', 'A'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.moveCursor((this.cursor - 1 + total) % total)));
-    ['RIGHT', 'D'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.moveCursor((this.cursor + 1) % total)));
-    ['ENTER', 'SPACE', 'F'].forEach(k => this.input.keyboard.on(`keydown-${k}`, () => this.choose(this.cursor)));
-    this.input.keyboard.on('keydown-ESC', () => transitionTo(this, 'CharacterSelect', { mode: this.matchData.mode }));
+    bindMenuInput(this, {
+      left: () => this.moveCursor((this.cursor - 1 + total) % total),
+      right: () => this.moveCursor((this.cursor + 1) % total),
+      confirm: () => this.choose(this.cursor),
+      back: () => transitionTo(this, 'CharacterSelect', { mode: this.matchData.mode }),
+    }, { keys: { confirm: ['F'] } });
 
-    addKeyHint(this, '← →  BROWSE     ENTER  FIGHT     ESC  BACK', GAME_HEIGHT - 22);
+    addKeyHint(this, {
+      keys: '← →  BROWSE     ENTER  FIGHT     ESC  BACK',
+      pad: '← →  BROWSE     ✕  FIGHT     ○  BACK',
+    }, GAME_HEIGHT - 22);
   }
 
   createThumb(x, y, index) {

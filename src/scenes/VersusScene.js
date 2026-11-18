@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindMenuInput } from '../input/menuInput.js';
 import { SoundManager } from '../audio/SoundManager.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
 import { getWarriorById } from '../config/warriors.js';
@@ -144,7 +145,7 @@ export class VersusScene extends Phaser.Scene {
     const go = () => transitionTo(this, 'Fight', this.matchData);
     this.time.delayedCall(HOLD_MS, go);
     this.time.delayedCall(700, () => {
-      this.input.keyboard.once('keydown', go);
+      bindMenuInput(this, { any: go });
       this.input.once('pointerdown', go);
     });
   }

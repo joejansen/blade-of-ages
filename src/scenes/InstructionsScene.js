@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { bindMenuInput } from '../input/menuInput.js';
+import { gamepads } from '../input/gamepads.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
 import {
   PALETTE, HEX, PLAYER_COLORS, PLAYER_HEX, displayText, bodyText, Backdrop, addHeader,
@@ -27,6 +29,18 @@ const P2_KEYS = [
   ['SPECIAL', ['.']],
 ];
 
+// PlayStation glyphs; Xbox pads use the same positions (A B X Y).
+const PAD_KEYS = [
+  ['MOVE', ['D-PAD', 'L-STICK']],
+  ['DASH', ['← ←', '→ →']],
+  ['JUMP', ['↑', '✕']],
+  ['CROUCH', ['↓']],
+  ['LIGHT', ['□']],
+  ['HEAVY', ['△']],
+  ['BLOCK', ['L1', 'R1']],
+  ['SPECIAL', ['○']],
+];
+
 const TIPS = [
   ['CHAIN', 'Tap light three times: two cuts and a finisher.'],
   ['HEAVY', 'Slow, but it crushes a guard. Break it and your foe is stunned.'],
@@ -47,8 +61,21 @@ export class InstructionsScene extends Phaser.Scene {
     });
     addHeader(this, 'THE WAY OF THE BLADE', 'HOW TO PLAY');
 
-    this.createPanel(GAME_WIDTH / 2 - 330, 'PLAYER ONE', 0, P1_KEYS);
-    this.createPanel(GAME_WIDTH / 2 + 330, 'PLAYER TWO', 1, P2_KEYS);
+    // A player's panel shows pad buttons once they're on a controller.
+    const layoutFor = p => (gamepads.lastDevice === 'gamepad' && gamepads.hasPadFor(p) ? 'pad' : 'keys');
+    const panels = [null, null];
+    const drawPanels = (animate) => {
+      [[P1_KEYS, 'PLAYER ONE'], [P2_KEYS, 'PLAYER TWO']].forEach(([keys, title], p) => {
+        const layout = layoutFor(p);
+        if (panels[p]?.layout === layout) return;
+        panels[p]?.container.destroy();
+        const x = GAME_WIDTH / 2 + (p === 0 ? -330 : 330);
+        panels[p] = { layout, container: this.createPanel(x, title, p, layout === 'pad' ? PAD_KEYS : keys, animate) };
+      });
+    };
+    drawPanels(true);
+    const off = gamepads.onChange(() => drawPanels(false));
+    this.events.once('shutdown', off);
 
     // Tips, centre column.
     const cx = GAME_WIDTH / 2;
@@ -64,12 +91,12 @@ export class InstructionsScene extends Phaser.Scene {
       });
     });
 
-    this.input.keyboard.on('keydown-ESC', () => transitionTo(this, 'Title'));
-    this.input.keyboard.on('keydown-ENTER', () => transitionTo(this, 'Title'));
-    addKeyHint(this, 'ESC  RETURN');
+    const back = () => transitionTo(this, 'Title');
+    bindMenuInput(this, { back, confirm: back });
+    addKeyHint(this, { keys: 'ESC  RETURN', pad: '○  RETURN' });
   }
 
-  createPanel(x, title, p, keys) {
+  createPanel(x, title, p, keys, animate) {
     const w = 330;
     const h = 430;
     const y = 390;
@@ -95,7 +122,11 @@ export class InstructionsScene extends Phaser.Scene {
       })).setOrigin(0, 0.5));
       let cxRight = w / 2 - 30;
       [...caps].reverse().forEach((cap) => {
-        const capW = cap.length > 1 ? 52 : 34;
+        const t = this.add.text(0, ry - 1, cap, displayText(15, {
+          weight: '900', spacing: 0, color: HEX.bone, shadow: false,
+        })).setOrigin(0.5);
+        const capW = Math.max(34, Math.ceil(t.width) + 18);
+        t.x = cxRight - capW / 2;
         const g = this.add.graphics();
         g.fillStyle(PALETTE.inkLift, 1);
         g.fillRoundedRect(cxRight - capW, ry - 16, capW, 32, 4);
@@ -103,17 +134,17 @@ export class InstructionsScene extends Phaser.Scene {
         g.strokeRoundedRect(cxRight - capW, ry - 16, capW, 32, 4);
         g.fillStyle(PALETTE.bone, 0.18);
         g.fillRect(cxRight - capW + 3, ry + 11, capW - 6, 2);
-        const t = this.add.text(cxRight - capW / 2, ry - 1, cap, displayText(15, {
-          weight: '900', spacing: 0, color: HEX.bone, shadow: false,
-        })).setOrigin(0.5);
         container.add([g, t]);
         cxRight -= capW + 8;
       });
     });
 
-    container.setAlpha(0);
-    this.tweens.add({
-      targets: container, alpha: 1, x: { from: x + (p === 0 ? -40 : 40), to: x }, duration: 500, delay: 150, ease: 'Cubic.easeOut',
-    });
+    if (animate) {
+      container.setAlpha(0);
+      this.tweens.add({
+        targets: container, alpha: 1, x: { from: x + (p === 0 ? -40 : 40), to: x }, duration: 500, delay: 150, ease: 'Cubic.easeOut',
+      });
+    }
+    return container;
   }
 }
