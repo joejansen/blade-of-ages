@@ -249,7 +249,7 @@ export class Fighter {
       this.airAttacked = false;
       this.vx = input.left ? -this.speed * AIR_CONTROL : input.right ? this.speed * AIR_CONTROL : 0;
       this.enterState('jumping');
-      SoundManager.playCombat(this.scene, 'jump');
+      SoundManager.playFighter(this, 'jump');
       return;
     }
 
@@ -305,7 +305,7 @@ export class Fighter {
     this.attackId++;
     if (this.isGrounded) this.vx = 0;
 
-    SoundManager.playCombat(this.scene, base.sound);
+    SoundManager.playFighter(this, base.sound);
     if (name === 'special') {
       this.specialMeter = 0;
       this.stats.specialsUsed++;
@@ -321,7 +321,7 @@ export class Fighter {
     this.vx = this.dir * (forward ? DASH_SPEED : -BACKDASH_SPEED);
     if (!forward) this.invuln = BACKDASH_INVULN;
     this.dashCooldown = DASH_COOLDOWN + (forward ? DASH_MS : BACKDASH_MS);
-    SoundManager.play(this.scene, 'jump', { volume: 0.25, detune: forward ? 500 : 250 });
+    SoundManager.play(this.scene, 'dash', { detune: forward ? 0 : -200 });
     this.spawnDust(3, -this.vx * 0.12);
   }
 
@@ -450,7 +450,7 @@ export class Fighter {
     this.spawnDust(heavy ? 7 : 5, 0);
     if (heavy) {
       this.scene.cameras.main.shake(140, 0.006);
-      SoundManager.play(this.scene, 'hit', { volume: 0.35, detune: -900 });
+      SoundManager.play(this.scene, 'body_fall');
     }
     if (this.state === 'jumping' || (this.state === 'attack' && this.moveName === 'air')) {
       this.vx = 0;

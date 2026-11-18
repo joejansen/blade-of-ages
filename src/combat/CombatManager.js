@@ -95,7 +95,7 @@ export class CombatManager {
     defender.blockstun = 0;
     defender.flash(0xbfe4ff, 90);
 
-    SoundManager.play(this.scene, 'block', { volume: 0.9, detune: 700 });
+    SoundManager.play(this.scene, 'parry');
     this.spawnBlockSparks(x, y, dir, true);
     this.scene.cameraRig?.punch(0.05);
     this.scene.cameras.main.flash(70, 190, 225, 255);
@@ -126,7 +126,7 @@ export class CombatManager {
     this.scene.cameras.main.shake(broken ? 160 : 70, broken ? 0.008 : 0.0025);
     if (broken) {
       defender.flash(0xffd27a, 110);
-      SoundManager.play(this.scene, 'hit', { volume: 0.7, detune: -500 });
+      SoundManager.play(this.scene, 'guard_break');
       this.scene.onGuardBreak?.(attacker.playerIndex);
       this.startHitstop([attacker, defender], 140);
     } else {
@@ -165,8 +165,7 @@ export class CombatManager {
     this.pushOffWall(attacker, defender, dir, move.knockback * 0.5);
 
     const big = move.big || lethal;
-    SoundManager.playCombat(this.scene, 'hit');
-    if (big) SoundManager.play(this.scene, 'hit', { volume: 0.5, detune: -700 });
+    SoundManager.playFighter(defender, big ? 'hit_heavy' : 'hit');
     this.spawnHitSparks(x, y, big, dir, attacker.profile.fx.trailColor);
     defender.flash();
     this.scene.cameraRig?.punch(lethal ? 0.09 : big ? 0.05 : 0.02);

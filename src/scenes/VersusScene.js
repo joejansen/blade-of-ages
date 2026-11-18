@@ -118,7 +118,7 @@ export class VersusScene extends Phaser.Scene {
       delay: 480,
       ease: 'Cubic.easeIn',
       onComplete: () => {
-        SoundManager.playCombat(this, 'heavy_attack');
+        SoundManager.playCombat(this, 'clash');
         this.cameras.main.shake(220, 0.012);
         this.cameras.main.flash(120, 224, 40, 63);
         vsGlow.setAlpha(0.7);
