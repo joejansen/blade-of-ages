@@ -20,6 +20,11 @@ export function isVectorWarrior(id) {
 
 export const vectorWarriorIds = () => Object.keys(DEFINITIONS);
 
+// Every part of a warrior with its drawn box (stretch applied), for tests.
+export function getVectorParts(id, weaponLength) {
+  return Object.entries(partsFor(id, weaponLength)).map(([name, part]) => ({ name, part, box: boxOf(part) }));
+}
+
 function partsFor(id, weaponLength) {
   const def = DEFINITIONS[id];
   return { ...def.parts, weapon: def.weapon(weaponLength) };
