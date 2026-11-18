@@ -64,7 +64,7 @@ export class Showcase {
 
     if (this.flourish && this.state === 'idle' && this.elapsed > this.nextFlourish) {
       const move = Phaser.Utils.Array.GetRandom(['lightAttack', 'heavyAttack', 'lightAttack']);
-      this.play(move, move === 'heavyAttack' ? 500 : 300);
+      this.play(move, move === 'heavyAttack' ? 560 : 290);
       this.nextFlourish = 2600 + Math.random() * 3000;
     }
 

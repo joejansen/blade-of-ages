@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT } from './config/constants.js';
+import { GAME_WIDTH, GAME_HEIGHT, GRAVITY } from './config/constants.js';
 import { BootScene } from './scenes/BootScene.js';
 import { TitleScene } from './scenes/TitleScene.js';
 import { InstructionsScene } from './scenes/InstructionsScene.js';
@@ -28,7 +28,7 @@ const config = {
   physics: {
     default: 'arcade',
     arcade: {
-      gravity: { y: 1200 },
+      gravity: { y: GRAVITY },
       debug: false,
     },
   },

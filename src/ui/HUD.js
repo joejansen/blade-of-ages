@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import {
   GAME_WIDTH,
   SPECIAL_METER_MAX,
+  GUARD_MAX,
   ROUNDS_TO_WIN,
+  ROUND_SECONDS,
 } from '../config/constants.js';
 import { PALETTE, HEX, PLAYER_COLORS, displayText } from './theme.js';
 
@@ -59,13 +61,14 @@ export class HUD {
       this.objects.push(frame, head, name);
     });
 
-    this.roundLabel = scene.add.text(GAME_WIDTH / 2, BAR_Y + 10, 'I', displayText(22, {
+    // The medallion carries the round clock; the round itself sits below.
+    this.clockLabel = scene.add.text(GAME_WIDTH / 2, BAR_Y + 10, String(ROUND_SECONDS), displayText(24, {
       weight: '900', spacing: 0, color: HEX.bone,
     })).setOrigin(0.5).setDepth(52);
-    this.roundKicker = scene.add.text(GAME_WIDTH / 2, BAR_Y + 48, 'ROUND', displayText(9, {
+    this.roundKicker = scene.add.text(GAME_WIDTH / 2, BAR_Y + 50, 'ROUND I', displayText(9, {
       weight: '700', spacing: 4, color: HEX.gold, shadow: false,
     })).setOrigin(0.5).setDepth(52);
-    this.objects.push(this.roundLabel, this.roundKicker);
+    this.objects.push(this.clockLabel, this.roundKicker);
 
     this.readyText = [0, 1].map(p => scene.add.text(
       p === 0 ? 92 + METER_W + 12 : GAME_WIDTH - 92 - METER_W - 12,
@@ -87,7 +90,7 @@ export class HUD {
     this.lastRatio = [1, 1];
   }
 
-  update(fighters, roundWins, currentRound, delta) {
+  update(fighters, roundWins, currentRound, delta, clockMs = ROUND_SECONDS * 1000) {
     const g = this.graphics;
     g.clear();
     const t = this.scene.time.now / 1000;
@@ -109,14 +112,19 @@ export class HUD {
       const ox = (Math.random() - 0.5) * jolt;
       const oy = (Math.random() - 0.5) * jolt;
 
-      this.drawHealth(g, p, ratio, this.ghost[p], ox, oy, t);
+      this.drawHealth(g, p, ratio, this.ghost[p], ox, oy, t, Phaser.Math.Clamp(f.guard / GUARD_MAX, 0, 1));
       this.drawMeter(g, p, f.specialMeter / SPECIAL_METER_MAX, t);
       this.drawPips(g, p, roundWins[p]);
     });
 
     this.drawMedallion(g);
     const numeral = ['I', 'II', 'III', 'IV', 'V'][currentRound - 1] || String(currentRound);
-    if (this.roundLabel.text !== numeral) this.roundLabel.setText(numeral);
+    if (this.roundKicker.text !== `ROUND ${numeral}`) this.roundKicker.setText(`ROUND ${numeral}`);
+    const seconds = String(Math.ceil(clockMs / 1000));
+    if (this.clockLabel.text !== seconds) this.clockLabel.setText(seconds);
+    const urgent = clockMs <= 10000;
+    this.clockLabel.setColor(urgent ? HEX.crimsonBright : HEX.bone);
+    this.clockLabel.setScale(urgent ? 1 + (1 - (clockMs % 1000) / 1000) * 0.18 : 1);
   }
 
   // Bar geometry: outer end at the portrait, inner end toward the centre.
@@ -136,7 +144,7 @@ export class HUD {
     ];
   }
 
-  drawHealth(g, p, ratio, ghost, ox, oy, t) {
+  drawHealth(g, p, ratio, ghost, ox, oy, t, guard = 1) {
     // Trough.
     g.fillStyle(PALETTE.ink, 0.85);
     g.fillPoints(this.barPoints(p, -0.01, 1.01, ox, oy), true);
@@ -166,10 +174,17 @@ export class HUD {
       g.fillPoints([top[0], top[1], { x: top[1].x - (p === 1 ? -2 : 2), y: top[1].y + 4 }, { x: top[0].x - (p === 1 ? -2 : 2), y: top[0].y + 4 }], true);
     }
 
-    // Player-coloured underline.
-    const under = this.barPoints(p, 0, 1, ox, oy);
-    g.lineStyle(2, PLAYER_COLORS[p], 0.9);
-    g.lineBetween(under[3].x, under[3].y + 3, under[2].x, under[2].y + 3);
+    // Player-coloured underline doubles as the guard gauge: it shortens as
+    // blocked blows wear the guard down and flashes when it is nearly gone.
+    const track = this.barPoints(p, 0, 1, ox, oy);
+    g.lineStyle(2, PALETTE.ink, 0.7);
+    g.lineBetween(track[3].x, track[3].y + 3, track[2].x, track[2].y + 3);
+    if (guard > 0) {
+      const under = this.barPoints(p, 0, guard, ox, oy);
+      const weak = guard < 0.35;
+      g.lineStyle(2, weak ? PALETTE.gold : PLAYER_COLORS[p], weak ? 0.6 + Math.sin(t * 14) * 0.4 : 0.9);
+      g.lineBetween(under[3].x, under[3].y + 3, under[2].x, under[2].y + 3);
+    }
     g.lineStyle(1, PALETTE.bone, 0.35);
     g.strokePoints(this.barPoints(p, -0.01, 1.01, ox, oy), true);
   }

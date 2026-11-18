@@ -7,6 +7,7 @@ import {
 
 const P1_KEYS = [
   ['MOVE', ['A', 'D']],
+  ['DASH', ['A A', 'D D']],
   ['JUMP', ['W']],
   ['CROUCH', ['S']],
   ['LIGHT', ['F']],
@@ -17,6 +18,7 @@ const P1_KEYS = [
 
 const P2_KEYS = [
   ['MOVE', ['←', '→']],
+  ['DASH', ['← ←', '→ →']],
   ['JUMP', ['↑']],
   ['CROUCH', ['↓']],
   ['LIGHT', [';']],
@@ -26,10 +28,11 @@ const P2_KEYS = [
 ];
 
 const TIPS = [
-  ['LIGHT', 'Quick strikes. Chain them while your foe reels.'],
-  ['HEAVY', 'Slow to swing, but more than twice the damage.'],
-  ['SPECIAL', 'Land blows to fill the meter. When it glows, unleash it — it cannot be blocked.'],
-  ['AIR', 'Every attack works mid-jump.'],
+  ['CHAIN', 'Tap light three times: two cuts and a finisher.'],
+  ['HEAVY', 'Slow, but it crushes a guard. Break it and your foe is stunned.'],
+  ['PARRY', 'Raise your guard the instant a blow lands to throw the attacker off balance.'],
+  ['DASH', 'Double-tap to close in. Dash back to slip a strike untouched.'],
+  ['SPECIAL', 'A full meter buys an unblockable charge. Cancel a clean hit into it.'],
 ];
 
 export class InstructionsScene extends Phaser.Scene {
@@ -50,10 +53,10 @@ export class InstructionsScene extends Phaser.Scene {
     // Tips, centre column.
     const cx = GAME_WIDTH / 2;
     TIPS.forEach(([head, body], i) => {
-      const y = 186 + i * 104;
+      const y = 176 + i * 88;
       const h = this.add.text(cx, y, head, displayText(14, { color: HEX.gold, weight: '900', spacing: 8 }))
         .setOrigin(0.5).setDepth(30);
-      const b = this.add.text(cx, y + 16, body, bodyText(19, { italic: true, color: HEX.bone, wordWrap: 280, lineSpacing: 0 }))
+      const b = this.add.text(cx, y + 15, body, bodyText(17, { italic: true, color: HEX.bone, wordWrap: 280, lineSpacing: 0 }))
         .setOrigin(0.5, 0).setDepth(30);
       [h, b].forEach(o => {
         o.setAlpha(0);
@@ -86,13 +89,13 @@ export class InstructionsScene extends Phaser.Scene {
     })).setOrigin(0, 0.5));
 
     keys.forEach(([action, caps], i) => {
-      const ry = -h / 2 + 104 + i * 44;
+      const ry = -h / 2 + 100 + i * 40;
       container.add(this.add.text(-w / 2 + 30, ry, action, displayText(13, {
         color: HEX.ash, weight: '700', spacing: 4, align: 'left', shadow: false,
       })).setOrigin(0, 0.5));
       let cxRight = w / 2 - 30;
       [...caps].reverse().forEach((cap) => {
-        const capW = 34;
+        const capW = cap.length > 1 ? 52 : 34;
         const g = this.add.graphics();
         g.fillStyle(PALETTE.inkLift, 1);
         g.fillRoundedRect(cxRight - capW, ry - 16, capW, 32, 4);

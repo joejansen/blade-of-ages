@@ -10,7 +10,7 @@ import { Showcase } from '../ui/Showcase.js';
 const STAT_ROWS = [
   { label: 'HITS LANDED', key: 'hitsLanded' },
   { label: 'DAMAGE DEALT', key: 'damageDealt' },
-  { label: 'SPECIALS UNLEASHED', key: 'specialsUsed' },
+  { label: 'BEST COMBO', key: 'maxCombo' },
 ];
 
 export class ResultScene extends Phaser.Scene {

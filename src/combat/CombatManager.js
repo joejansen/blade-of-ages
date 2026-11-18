@@ -1,87 +1,189 @@
 import Phaser from 'phaser';
 import {
-  HITSTOP_DURATION_LIGHT,
-  HITSTOP_DURATION_HEAVY,
+  FIGHTER_SCALE,
+  CHIP_DAMAGE_RATIO,
+  PARRY_WINDOW,
+  SPECIAL_METER_PER_DAMAGE,
+  SPECIAL_METER_PER_DAMAGE_TAKEN,
 } from '../config/constants.js';
 import { SoundManager } from '../audio/SoundManager.js';
 
+const S = FIGHTER_SCALE;
+const COMBO_SCALING = 0.1;   // damage lost per extra hit in a combo
+const MIN_COMBO_SCALE = 0.5;
+const COUNTER_BONUS = 1.25;
+const HITSTUN_DECAY = 0.1;   // stun lost per extra hit, so strings must end
+const MIN_HITSTUN_SCALE = 0.6;
+const JUGGLE_LIMIT = 2;      // a heavy landed this deep into a combo floors
+const COMBO_LIMIT = 4;       // any hit this deep floors: no endless strings
+
+// Resolves attacks into hits, blocks, parries and guard breaks, and owns the
+// hitstop and impact effects that sell them.
 export class CombatManager {
   constructor(scene) {
     this.scene = scene;
     this.hitstopTimer = 0;
-    this.isPaused = false;
-    this.sparkEmitters = [];
+    this.frozen = [];
   }
 
   update(fighter1, fighter2, delta) {
     if (this.tickHitstop(delta)) return true; // Signal that combat is paused
 
-    // Check attacks both directions
     this.checkAttack(fighter1, fighter2);
     this.checkAttack(fighter2, fighter1);
+    this.separate(fighter1, fighter2);
 
-    return false;
+    return this.hitstopTimer > 0;
+  }
+
+  // Fighters cannot stand inside each other; whoever is pressing forward
+  // shoves the other along. Jumping clear over an opponent is allowed.
+  separate(a, b) {
+    if (a.isDown() || b.isDown()) return;
+    if (Math.abs(a.y - b.y) > 70 * S) return;
+    const minGap = 36 * S;
+    const dx = b.x - a.x;
+    const gap = Math.abs(dx);
+    if (gap >= minGap) return;
+    const push = (minGap - gap) / 2;
+    const sign = dx === 0 ? (a.playerIndex === 0 ? 1 : -1) : Math.sign(dx);
+    const bounds = this.scene.physics.world.bounds;
+    const half = a.sprite.body.width / 2;
+    const clampX = x => Phaser.Math.Clamp(x, bounds.x + half, bounds.right - half);
+    let ax = clampX(a.x - sign * push);
+    let bx = clampX(b.x + sign * push);
+    // If one is pinned on the wall the other takes the whole correction.
+    if (Math.abs(bx - ax) < minGap) ax = clampX(bx - sign * minGap);
+    if (Math.abs(bx - ax) < minGap) bx = clampX(ax + sign * minGap);
+    a.sprite.x = ax;
+    b.sprite.x = bx;
   }
 
   checkAttack(attacker, defender) {
     if (!attacker.isAttacking() || attacker.hasHitThisAttack) return;
-    if (!defender.isAlive()) return;
+    if (!defender.isAlive() || defender.isInvulnerable()) return;
 
     const attackBox = attacker.getAttackHitbox();
     if (!attackBox) return;
-
     const defenderBox = defender.getHitbox();
     if (!this.boxesOverlap(attackBox, defenderBox)) return;
 
-    // Hit confirmed
     attacker.hasHitThisAttack = true;
-    const damage = attacker.getAttackDamage();
-    const isHeavy = attacker.state === 'heavyAttack';
-    const isSpecial = attacker.state === 'special';
-    const defenderWasStunned = defender.state === 'hit';
-
-    const result = defender.takeDamage(damage, attacker.x, isHeavy, isSpecial);
-
-    // Attacker gains special meter
-    attacker.addSpecialMeter(result.actualDamage);
-    attacker.stats.hitsLanded++;
-    attacker.stats.damageDealt += result.actualDamage;
-
-    // A hit that lands while the defender is still reeling extends the combo.
-    if (!result.wasBlocked) {
-      attacker.combo = defenderWasStunned ? (attacker.combo || 1) + 1 : 1;
-      if (attacker.combo >= 2) this.scene.onCombo?.(attacker.playerIndex, attacker.combo);
-    }
-
-    // Visual effects
-    const hitX = (attackBox.x + attackBox.width / 2 + defenderBox.x + defenderBox.width / 2) / 2;
-    const hitY = attackBox.y + attackBox.height / 2;
+    const move = attacker.move;
     const dir = attacker.x < defender.x ? 1 : -1;
-    const rig = this.scene.cameraRig;
-    const isBig = isHeavy || isSpecial;
-    const isLethal = !defender.isAlive();
+    const hitX = Phaser.Math.Clamp(
+      attacker.x + dir * attackBox.width * 0.8,
+      defenderBox.x, defenderBox.x + defenderBox.width,
+    );
+    const hitY = Phaser.Math.Clamp(attackBox.y + attackBox.height * 0.42, defenderBox.y + 20, defenderBox.y + defenderBox.height - 30);
+    const guarding = defender.isBlockingToward(attacker.x) && !move.unblockable;
 
-    if (result.wasBlocked) {
-      SoundManager.playCombat(this.scene, 'block');
-      this.spawnBlockSparks(hitX, hitY, dir);
-      rig?.punch(0.012);
-      this.scene.cameras.main.shake(70, 0.002);
+    if (guarding && defender.blockAge <= PARRY_WINDOW && defender.blockstun <= 0) {
+      this.resolveParry(attacker, defender, dir, hitX, hitY);
+    } else if (guarding) {
+      this.resolveBlock(attacker, defender, move, dir, hitX, hitY);
     } else {
-      SoundManager.playCombat(this.scene, 'hit');
-      this.spawnHitSparks(hitX, hitY, isBig || isLethal, dir, attacker.profile.fx.trailColor);
-      defender.flash();
-      rig?.punch(isLethal ? 0.12 : isBig ? 0.06 : 0.025);
-      this.scene.cameras.main.shake(isBig ? 170 : 90, isBig ? 0.009 : 0.004);
+      this.resolveHit(attacker, defender, move, dir, hitX, hitY);
     }
+  }
 
-    // Hitstop (freeze frame); a killing blow holds longest.
-    if (isLethal) {
-      this.startHitstop(attacker, defender, HITSTOP_DURATION_HEAVY * 2.2);
-    } else if (isBig) {
-      this.startHitstop(attacker, defender, HITSTOP_DURATION_HEAVY);
-    } else if (!result.wasBlocked) {
-      this.startHitstop(attacker, defender, HITSTOP_DURATION_LIGHT);
+  resolveParry(attacker, defender, dir, x, y) {
+    attacker.lastAttackResult = 'parried';
+    attacker.applyParried(-dir);
+    defender.addSpecialMeter(14);
+    defender.stats.parries++;
+    defender.blockstun = 0;
+    defender.flash(0xbfe4ff, 90);
+
+    SoundManager.play(this.scene, 'block', { volume: 0.9, detune: 700 });
+    this.spawnBlockSparks(x, y, dir, true);
+    this.scene.cameraRig?.punch(0.05);
+    this.scene.cameras.main.flash(70, 190, 225, 255);
+    this.scene.onParry?.(defender.playerIndex);
+    this.startHitstop([attacker, defender], 150);
+  }
+
+  resolveBlock(attacker, defender, move, dir, x, y) {
+    attacker.lastAttackResult = 'blocked';
+    const damage = attacker.getAttackDamage();
+    const chip = Math.max(1, Math.round(damage * CHIP_DAMAGE_RATIO));
+    const broken = defender.applyBlock({
+      chip,
+      guardDamage: move.guard,
+      blockstun: move.blockstun,
+      pushback: move.knockback * 0.55,
+      dir,
+    });
+    attacker.addSpecialMeter(chip * SPECIAL_METER_PER_DAMAGE + 2);
+    attacker.stats.damageDealt += chip;
+    // Steel shoves back: the attacker gives ground too.
+    attacker.vx -= dir * move.knockback * 0.25 * S;
+    this.pushOffWall(attacker, defender, dir, move.knockback * 0.4);
+
+    SoundManager.playCombat(this.scene, 'block');
+    this.spawnBlockSparks(x, y, dir, broken);
+    this.scene.cameraRig?.punch(broken ? 0.06 : 0.014);
+    this.scene.cameras.main.shake(broken ? 160 : 70, broken ? 0.008 : 0.0025);
+    if (broken) {
+      defender.flash(0xffd27a, 110);
+      SoundManager.play(this.scene, 'hit', { volume: 0.7, detune: -500 });
+      this.scene.onGuardBreak?.(attacker.playerIndex);
+      this.startHitstop([attacker, defender], 140);
+    } else {
+      this.startHitstop([attacker, defender], move.big ? 70 : 35);
     }
+  }
+
+  resolveHit(attacker, defender, move, dir, x, y) {
+    attacker.lastAttackResult = 'hit';
+    // Caught mid-swing: the defender was committed and pays extra.
+    const counter = defender.isAttacking() && !defender.isRecovering();
+    const comboScale = Math.max(MIN_COMBO_SCALE, 1 - COMBO_SCALING * defender.comboTaken);
+    const damage = Math.max(1, Math.round(attacker.getAttackDamage() * comboScale * (counter ? COUNTER_BONUS : 1)));
+
+    const stunScale = Math.max(MIN_HITSTUN_SCALE, 1 - HITSTUN_DECAY * defender.comboTaken);
+    const lethal = defender.applyHit({
+      damage,
+      knockback: move.knockback,
+      hitstun: (move.hitstun + (counter ? 90 : 0)) * stunScale,
+      big: move.big,
+      knockdown: move.knockdown
+        || defender.comboTaken >= COMBO_LIMIT
+        || (move.kind === 'heavy' && defender.comboTaken >= JUGGLE_LIMIT),
+      dir,
+    });
+
+    attacker.addSpecialMeter(damage * SPECIAL_METER_PER_DAMAGE);
+    defender.addSpecialMeter(damage * SPECIAL_METER_PER_DAMAGE_TAKEN);
+    attacker.stats.hitsLanded++;
+    attacker.stats.damageDealt += damage;
+    // The defender counts the hits they have taken without recovering.
+    attacker.combo = defender.comboTaken;
+    attacker.stats.maxCombo = Math.max(attacker.stats.maxCombo, attacker.combo);
+    if (attacker.combo >= 2) this.scene.onCombo?.(attacker.playerIndex, attacker.combo);
+    if (counter) this.scene.onCounter?.(attacker.playerIndex);
+    this.pushOffWall(attacker, defender, dir, move.knockback * 0.5);
+
+    const big = move.big || lethal;
+    SoundManager.playCombat(this.scene, 'hit');
+    if (big) SoundManager.play(this.scene, 'hit', { volume: 0.5, detune: -700 });
+    this.spawnHitSparks(x, y, big, dir, attacker.profile.fx.trailColor);
+    defender.flash();
+    this.scene.cameraRig?.punch(lethal ? 0.09 : big ? 0.05 : 0.02);
+    this.scene.cameras.main.shake(big ? 180 : 90, big ? 0.009 : 0.0035);
+
+    this.startHitstop([attacker, defender], lethal ? move.hitstop * 2.2 : move.hitstop + (counter ? 40 : 0));
+  }
+
+  // A defender with their back to the wall cannot be pushed further, so the
+  // attacker is driven off instead; pressure cannot be kept up for free.
+  pushOffWall(attacker, defender, dir, amount) {
+    const bounds = this.scene.physics.world.bounds;
+    const half = defender.sprite.body.width / 2;
+    const cornered = dir > 0
+      ? defender.x >= bounds.right - half - 4
+      : defender.x <= bounds.x + half + 4;
+    if (cornered) attacker.vx = -dir * amount * S;
   }
 
   // Advances an active hitstop; returns true while still frozen.
@@ -90,44 +192,19 @@ export class CombatManager {
     this.hitstopTimer -= delta;
     if (this.hitstopTimer <= 0) {
       this.hitstopTimer = 0;
-      this.resumeFromHitstop();
+      this.frozen.forEach(f => f.unfreeze());
+      this.frozen = [];
       return false;
     }
     return true;
   }
 
-  startHitstop(attacker, defender, duration) {
-    this.hitstopTimer = duration;
-    this.isPaused = true;
-    // Freeze both fighters, remembering the defender's knockback so the
-    // blow still sends them back once time resumes.
-    this.storedKnockback = {
-      x: defender.sprite.body.velocity.x,
-      y: defender.sprite.body.velocity.y,
-    };
-    attacker.sprite.body.setVelocity(0, 0);
-    attacker.sprite.body.setAllowGravity(false);
-    defender.sprite.body.setVelocity(0, 0);
-    defender.sprite.body.setAllowGravity(false);
-    this.frozenAttacker = attacker;
-    this.frozenDefender = defender;
-  }
-
-  resumeFromHitstop() {
-    this.isPaused = false;
-    // Re-enable gravity for both fighters in the scene
-    if (this.frozenAttacker) {
-      this.frozenAttacker.sprite.body.setAllowGravity(true);
+  startHitstop(fighters, duration) {
+    this.hitstopTimer = Math.max(this.hitstopTimer, duration);
+    for (const f of fighters) {
+      f.freeze();
+      if (!this.frozen.includes(f)) this.frozen.push(f);
     }
-    if (this.frozenDefender) {
-      this.frozenDefender.sprite.body.setAllowGravity(true);
-      if (this.storedKnockback) {
-        this.frozenDefender.sprite.body.setVelocity(this.storedKnockback.x, this.storedKnockback.y);
-      }
-    }
-    this.storedKnockback = null;
-    this.frozenAttacker = null;
-    this.frozenDefender = null;
   }
 
   // Impact: white flash, a cut mark across the contact point, sparks thrown
@@ -136,18 +213,19 @@ export class CombatManager {
   spawnHitSparks(x, y, isBig, dir, trailColor = 0xffffff) {
     const scene = this.scene;
     const ADD = Phaser.BlendModes.ADD;
+    const k = S * 0.7;
 
     const flash = scene.add.image(x, y, 'fx_soft').setDepth(21).setBlendMode(ADD)
-      .setScale(isBig ? 3.2 : 2).setAlpha(1);
-    scene.tweens.add({ targets: flash, scale: isBig ? 5 : 3, alpha: 0, duration: 140, onComplete: () => flash.destroy() });
+      .setScale((isBig ? 2 : 1.3) * k).setAlpha(0.9);
+    scene.tweens.add({ targets: flash, scale: (isBig ? 3.4 : 2.2) * k, alpha: 0, duration: 130, onComplete: () => flash.destroy() });
 
     // The cut.
     const angle = (dir > 0 ? -0.5 : 0.5) + (Math.random() - 0.5) * 0.5;
-    const cutLen = isBig ? 3.4 : 2.2;
+    const cutLen = (isBig ? 3.6 : 2.3) * k;
     const cutGlow = scene.add.image(x, y, 'fx_streak').setDepth(20).setBlendMode(ADD)
-      .setTint(0xe0283f).setRotation(angle).setScale(0.2, isBig ? 2.2 : 1.6).setOrigin(0.5);
+      .setTint(0xe0283f).setRotation(angle).setScale(0.2, (isBig ? 2.4 : 1.7) * k).setOrigin(0.5);
     const cut = scene.add.image(x, y, 'fx_streak').setDepth(21).setBlendMode(ADD)
-      .setTint(trailColor).setRotation(angle).setScale(0.2, isBig ? 0.9 : 0.7).setOrigin(0.5);
+      .setTint(trailColor).setRotation(angle).setScale(0.2, (isBig ? 0.9 : 0.7) * k).setOrigin(0.5);
     scene.tweens.add({ targets: [cut, cutGlow], scaleX: cutLen, duration: 70, ease: 'Expo.easeOut' });
     scene.tweens.add({
       targets: [cut, cutGlow], alpha: 0, scaleY: 0.1, delay: 70, duration: 220,
@@ -155,12 +233,12 @@ export class CombatManager {
     });
 
     // Sparks.
-    const count = isBig ? 14 : 8;
+    const count = isBig ? 16 : 9;
     for (let i = 0; i < count; i++) {
       const a = (dir > 0 ? 0 : Math.PI) + (Math.random() - 0.5) * 2.2;
-      const speed = (isBig ? 320 : 220) * (0.5 + Math.random());
+      const speed = (isBig ? 340 : 230) * (0.5 + Math.random()) * k;
       const spark = scene.add.image(x, y, 'fx_streak').setDepth(21).setBlendMode(ADD)
-        .setRotation(a).setScale(0.35 + Math.random() * 0.4, 0.5)
+        .setRotation(a).setScale((0.35 + Math.random() * 0.4) * k, 0.5 * k)
         .setTint(Phaser.Utils.Array.GetRandom([0xffffff, 0xffe2a0, 0xffb060]));
       scene.tweens.add({
         targets: spark,
@@ -176,34 +254,37 @@ export class CombatManager {
 
     // Droplets.
     const drops = scene.add.particles(x, y, 'fx_drop', {
-      speed: { min: 120, max: isBig ? 420 : 300 },
+      speed: { min: 140, max: (isBig ? 480 : 340) * k },
       angle: dir > 0 ? { min: -70, max: 20 } : { min: 160, max: 250 },
-      gravityY: 1100,
-      lifespan: { min: 380, max: 720 },
-      scale: { start: isBig ? 0.75 : 0.55, end: 0.15 },
+      gravityY: 1500,
+      lifespan: { min: 380, max: 760 },
+      scale: { start: (isBig ? 0.75 : 0.55) * k, end: 0.15 },
       tint: [0xb3122a, 0x7a0a18, 0xe0283f],
       alpha: { start: 1, end: 0.6 },
       emitting: false,
     }).setDepth(19);
-    drops.explode(isBig ? 22 : 10);
+    drops.explode(isBig ? 24 : 11);
     scene.time.delayedCall(900, () => drops.destroy());
 
     if (isBig) {
       const ring = scene.add.image(x, y, 'fx_ring').setDepth(20).setBlendMode(ADD)
-        .setScale(0.3).setTint(0xffe2c0);
-      scene.tweens.add({ targets: ring, scale: 2.2, alpha: 0, duration: 320, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+        .setScale(0.3 * k).setTint(0xffe2c0);
+      scene.tweens.add({ targets: ring, scale: 2.4 * k, alpha: 0, duration: 320, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
     }
   }
 
-  // Steel on steel: cold sparks bursting upward, a tight ring.
-  spawnBlockSparks(x, y, dir) {
+  // Steel on steel: cold sparks bursting upward, a tight ring. `strong`
+  // (parry / guard break) throws a wider burst.
+  spawnBlockSparks(x, y, dir, strong = false) {
     const scene = this.scene;
     const ADD = Phaser.BlendModes.ADD;
-    for (let i = 0; i < 9; i++) {
-      const a = -Math.PI / 2 + (dir > 0 ? -0.6 : 0.6) + (Math.random() - 0.5) * 1.8;
-      const speed = 160 + Math.random() * 160;
+    const k = S * 0.8 * (strong ? 1.5 : 1);
+    const count = strong ? 18 : 9;
+    for (let i = 0; i < count; i++) {
+      const a = -Math.PI / 2 + (dir > 0 ? -0.6 : 0.6) + (Math.random() - 0.5) * (strong ? 3.4 : 1.8);
+      const speed = (160 + Math.random() * 160) * k;
       const spark = scene.add.image(x, y, 'fx_streak').setDepth(21).setBlendMode(ADD)
-        .setRotation(a).setScale(0.4, 0.45).setTint(Phaser.Utils.Array.GetRandom([0xbfe4ff, 0xffffff, 0x9cc4e4]));
+        .setRotation(a).setScale(0.4 * k, 0.45 * k).setTint(Phaser.Utils.Array.GetRandom([0xbfe4ff, 0xffffff, 0x9cc4e4]));
       scene.tweens.add({
         targets: spark,
         x: x + Math.cos(a) * speed * 0.25,
@@ -216,10 +297,10 @@ export class CombatManager {
       });
     }
     const ring = scene.add.image(x, y, 'fx_ring').setDepth(20).setBlendMode(ADD)
-      .setScale(0.2).setTint(0x9cc4e4);
-    scene.tweens.add({ targets: ring, scale: 1.1, alpha: 0, duration: 220, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
-    const flash = scene.add.image(x, y, 'fx_soft').setDepth(21).setBlendMode(ADD).setScale(1.6).setTint(0xcfe8ff);
-    scene.tweens.add({ targets: flash, alpha: 0, scale: 2.4, duration: 120, onComplete: () => flash.destroy() });
+      .setScale(0.2 * k).setTint(0x9cc4e4);
+    scene.tweens.add({ targets: ring, scale: 1.2 * k, alpha: 0, duration: 240, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+    const flash = scene.add.image(x, y, 'fx_soft').setDepth(21).setBlendMode(ADD).setScale(1.6 * k).setTint(0xcfe8ff);
+    scene.tweens.add({ targets: flash, alpha: 0, scale: 2.4 * k, duration: 120, onComplete: () => flash.destroy() });
   }
 
   boxesOverlap(a, b) {
@@ -232,6 +313,7 @@ export class CombatManager {
   }
 
   destroy() {
-    // Cleanup
+    this.frozen.forEach(f => f.unfreeze());
+    this.frozen = [];
   }
 }

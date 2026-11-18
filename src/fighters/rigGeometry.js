@@ -23,7 +23,12 @@ export function solveLimb(root, target, a, b, bend = 1) {
 export function computeRigGeometry(pose, profile, x, baseY, dir, scale = 1) {
   const crouch = clamp(pose.crouchFactor || 0, 0, 1);
   const lean = (pose.torsoAngle || 0) * RAD;
-  const hip = { x: 0, y: -55 + crouch * 23 + (pose.bodyY || 0) * 0.45 + (pose.headY || 0) * 0.06 };
+  // hipX shifts weight over planted feet; hipDrop takes the pelvis to the
+  // floor for knockdowns (never through it).
+  const hip = {
+    x: pose.hipX || 0,
+    y: Math.min(-7, -55 + crouch * 23 + (pose.bodyY || 0) * 0.45 + (pose.headY || 0) * 0.06 + (pose.hipDrop || 0)),
+  };
   // The sprite gait has its own stance width; retain animated legSpread in
   // the pose for the vector fallback, which does not consume foot targets.
   const walkBlend = clamp(pose.walkBlend || 0, 0, 1);
@@ -35,7 +40,11 @@ export function computeRigGeometry(pose, profile, x, baseY, dir, scale = 1) {
   // planted foot off the floor to satisfy an unreachable target.
   for (const [target, hipX] of [[frontTarget, -5], [backTarget, 5]]) {
     const reach = RIG.thigh + RIG.shin - 0.01;
-    hip.y = Math.max(hip.y, target.y - Math.sqrt(Math.max(0, reach * reach - (target.x - hipX) ** 2)));
+    // A foot the hip has travelled too far from is dragged along, rather
+    // than the pelvis dropping to the floor to reach it.
+    const socket = hip.x + hipX;
+    target.x = clamp(target.x, socket - reach * 0.8, socket + reach * 0.8);
+    hip.y = Math.max(hip.y, target.y - Math.sqrt(Math.max(0, reach * reach - (target.x - hip.x - hipX) ** 2)));
   }
   const torsoPoint = (dx, dy) => ({ x: hip.x + dx * Math.cos(lean) - dy * Math.sin(lean), y: hip.y + dx * Math.sin(lean) + dy * Math.cos(lean) });
   const neck = torsoPoint(0, -RIG.torso);
@@ -44,7 +53,11 @@ export function computeRigGeometry(pose, profile, x, baseY, dir, scale = 1) {
   const backShoulder = torsoPoint(0.175 * RIG.torso, -0.8 * RIG.torso);
   const armAngle = (pose.armAngle || 0) * RAD;
   // Guard at chest height. Wind-up and follow-through extend from this guard.
-  const handTarget = { x: frontShoulder.x + 25 + Math.sin(armAngle) * 15, y: frontShoulder.y + 13 - Math.cos(armAngle) * 12 - (pose.handLift || 0) };
+  // handX/handY carry it through wind-ups and strikes.
+  const handTarget = {
+    x: frontShoulder.x + 25 + Math.sin(armAngle) * 15 + (pose.handX || 0),
+    y: frontShoulder.y + 13 - Math.cos(armAngle) * 12 - (pose.handLift || 0) + (pose.handY || 0),
+  };
   const frontArm = solveLimb(frontShoulder, handTarget, RIG.upperArm, RIG.forearm, 1);
   // Rear hand guards the lower chest; the elbow hangs behind and below it,
   // using the same anatomical bend direction as the weapon arm.
@@ -60,6 +73,7 @@ export function computeRigGeometry(pose, profile, x, baseY, dir, scale = 1) {
   const weaponLen = profile.trail.renderedWeaponLength * scale;
   return {
     hip: world(hip), neck: world(neck), torsoAngle: lean * dir,
+    headAngle: (lean * 0.3 + (pose.headTilt || 0) * RAD) * dir,
     frontArm: chain(frontArm), backArm: chain(backArm), frontLeg: chain(frontLeg), backLeg: chain(backLeg),
     weapon: {
       armX: world(frontShoulder).x, armY: world(frontShoulder).y,
