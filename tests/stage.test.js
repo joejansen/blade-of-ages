@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stageIds, getStage, drawForeground, FG_BOX, LANE, FEATHER } from '../src/art/stage/index.js';
+import { stageIds, getStage, drawForeground, FG_BOX, LANE, FEATHER, backgroundDrainAlpha, midgroundCoverage } from '../src/art/stage/index.js';
 import { recordingContext } from './vectorCheck.js';
 import { GROUND_Y } from '../src/config/constants.js';
 
@@ -8,6 +8,21 @@ const ARENAS = ['castle', 'dojo', 'longship', 'colosseum', 'steppe', 'thermopyla
 
 test('every arena has a layered stage', () => {
   assert.deepEqual([...stageIds()].sort(), [...ARENAS].sort());
+});
+
+test('KO drain is an exact crossfade across the horizon', () => {
+  // Stack: graded plates, drained background (alpha a), drained midground
+  // (alpha k*m). Each drained plate must end up weighted by k, the graded
+  // composite by 1 - k, whatever the midground coverage m.
+  for (let k = 0; k <= 1; k += 0.125) for (let m = 0; m <= 1; m += 0.125) {
+    const a = backgroundDrainAlpha(k, m);
+    const graded = (1 - a) * (1 - k * m);
+    assert.ok(Math.abs(graded - (1 - k)) < 1e-9, `k=${k} m=${m}: graded weight ${graded}`);
+    assert.ok(Math.abs(a * (1 - k * m) - k * (1 - m)) < 1e-9, `k=${k} m=${m}: drained background weight`);
+  }
+  assert.equal(midgroundCoverage(400, 500), 0);
+  assert.equal(midgroundCoverage(500, 500), 1);
+  assert.equal(midgroundCoverage(500 - FEATHER / 2, 500), 0.5);
 });
 
 for (const id of ARENAS) {

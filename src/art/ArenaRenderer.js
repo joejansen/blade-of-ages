@@ -4,12 +4,13 @@ import { drawArena } from './arenas.js';
 import { bakeGrade } from '../ui/theme.js';
 import {
   getStage, buildForegroundTexture, BG_PARALLAX, FG_PARALLAX, FEATHER, FG_BOX,
+  midgroundCoverage, backgroundDrainAlpha, DRAIN_STRIP,
 } from './stage/index.js';
 
 // Depth bands (fighters are 12-13.6, hit sparks 19-21, front fog 24).
 const DEPTH = {
-  // Both drained plates sit above both graded ones, so at full drain no
-  // colour shows through where the midground fades out at the horizon.
+  // Both drained plates sit above both graded ones; their alphas are set so
+  // the KO drain is an exact crossfade (stage/index.js backgroundDrainAlpha).
   background: 0, midground: 0.1, backgroundDrain: 0.2, midgroundDrain: 0.3,
   foregroundRim: 17.9, foreground: 18, foregroundDrain: 18.1,
 };
@@ -145,11 +146,27 @@ export class ArenaRenderer {
       const plate = (key, depth, scroll) => scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, key)
         .setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setDepth(depth).setScrollFactor(scroll);
       this.background = plate(this.bakedKeys[0], DEPTH.background, BG_PARALLAX);
-      const backgroundDrain = plate(this.bakedKeys[1], DEPTH.backgroundDrain, BG_PARALLAX).setAlpha(0);
+      // The drained background stops at the horizon and is cut into strips
+      // across the feather band, so each pixel crossfades exactly (see
+      // backgroundDrainAlpha).
+      const texHeight = this.background.height;
+      const ky = texHeight / GAME_HEIGHT;
+      const bandTop = horizon - FEATHER;
+      const strip = (y0, y1, m) => {
+        const img = plate(this.bakedKeys[1], DEPTH.backgroundDrain, BG_PARALLAX).setAlpha(0);
+        img.setCrop(0, y0 * ky, this.background.width, (y1 - y0) * ky);
+        img.coverage = m;
+        return img;
+      };
+      this.backgroundDrain = [strip(0, bandTop, 0)];
+      for (let y = bandTop; y < horizon; y += DRAIN_STRIP) {
+        const y1 = Math.min(horizon, y + DRAIN_STRIP);
+        this.backgroundDrain.push(strip(y, y1, midgroundCoverage((y + y1) / 2, horizon)));
+      }
       this.midground = plate(this.bakedKeys[2], DEPTH.midground, 1);
       const midgroundDrain = plate(this.bakedKeys[3], DEPTH.midgroundDrain, 1).setAlpha(0);
-      this.drainLayers.push(backgroundDrain, midgroundDrain);
-      this.displayObjects.push(this.background, backgroundDrain, this.midground, midgroundDrain);
+      this.drainLayers.push(midgroundDrain);
+      this.displayObjects.push(this.background, ...this.backgroundDrain, this.midground, midgroundDrain);
     } else {
       this.displayObjects.push(drawArena(scene, arenaId, { includeFloor: false }));
     }
@@ -316,6 +333,7 @@ export class ArenaRenderer {
   // 0 = the arena's mood grade, 1 = fully drained to monochrome.
   setDrain(k) {
     for (const layer of this.drainLayers) layer.setAlpha(k);
+    for (const strip of this.backgroundDrain || []) strip.setAlpha(backgroundDrainAlpha(k, strip.coverage));
     this.drain = k;
     this.updateForegroundRim();
   }

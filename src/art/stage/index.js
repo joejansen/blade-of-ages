@@ -16,6 +16,25 @@ export const BG_PARALLAX = 0.92;
 export const FG_PARALLAX = 1.1;
 export const FEATHER = 60;
 
+// The midground's mask: 0 above the feather band, 1 at and below the horizon.
+export function midgroundCoverage(y, horizon) {
+  return Math.min(1, Math.max(0, (y - (horizon - FEATHER)) / FEATHER));
+}
+
+// During the KO drain the drained background is drawn over the graded plates
+// and the drained midground (alpha k * m) over that. For the result to be an
+// exact crossfade, graded weight 1 - k everywhere, the drained background
+// needs alpha k(1-m)/(1-km) where the midground covers m. Below the horizon
+// (m = 1) it is 0: the drained midground covers the floor on its own.
+export function backgroundDrainAlpha(k, m) {
+  if (m >= 1) return 0;
+  return (k * (1 - m)) / (1 - k * m);
+}
+
+// Height of the strips the drained background is cut into across the
+// feather band, each with its own alpha.
+export const DRAIN_STRIP = 4;
+
 // The foreground texture covers this screen region; the margin leaves room
 // for parallax when the camera pans and zooms.
 export const FG_MARGIN = 48;
