@@ -13,6 +13,18 @@ To change a warrior, edit its file and run `node tests/vectorCheck.js <id> <weap
 
 The PNG parts under `public/assets/warriors/` and the generation workflow below are no longer used at runtime. They are kept for reference.
 
+A weapon is pinned at the centre of the fist (`HEROIC_RIG.grip` past the wrist) and drawn behind the forearm, so the fist closes over the grip.
+
+## Stages are layered
+
+`src/art/ArenaRenderer.js` builds every fight stage from three layers, configured in `src/art/stage/index.js`:
+
+- **background**: the painted plate above the stage's `horizon`. It scrolls slower than the fighters.
+- **midground**: the plate's floor below the horizon, which the fighters stand on. It moves with them.
+- **foreground**: props drawn in code (`src/art/stage/props.js`, same ink kit as the fighters, in screen pixels), drawn above the fighters as dark near-silhouettes with a rim of the stage's light. It scrolls faster than the fighters, and it dims and drains to monochrome with the rest of the stage.
+
+Place foreground props inside the frame the fight camera actually shows (about x 90–1190, down to y ≈ 690 at its usual zoom). In the middle lane (`LANE`) a prop may rise only to just above the fighters' soles; tall props go at the edges. `tests/stage.test.js` enforces both rules.
+
 ## Goal
 
 Ship fighters that feel coherent, readable, and alive in motion.

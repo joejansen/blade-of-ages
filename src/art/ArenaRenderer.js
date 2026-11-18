@@ -2,6 +2,22 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, GROUND_Y } from '../config/constants.js';
 import { drawArena } from './arenas.js';
 import { bakeGrade } from '../ui/theme.js';
+import {
+  getStage, buildForegroundTexture, BG_PARALLAX, FG_PARALLAX, FEATHER, FG_BOX,
+} from './stage/index.js';
+
+// Depth bands (fighters are 12-13.6, hit sparks 19-21, front fog 24).
+const DEPTH = {
+  // Both drained plates sit above both graded ones, so at full drain no
+  // colour shows through where the midground fades out at the horizon.
+  background: 0, midground: 0.1, backgroundDrain: 0.2, midgroundDrain: 0.3,
+  foregroundRim: 17.9, foreground: 18, foregroundDrain: 18.1,
+};
+// The foreground is nearest the camera and outside the fight's light, so it
+// reads as near-silhouette; a rim of the stage's light picks out its top
+// edges, as the fighters' rim light does theirs.
+const FG_BRIGHTNESS = 0.5;
+const FG_RIM = { y: -2.5, alpha: 0.6 };
 
 // Per-arena mood. The painted backgrounds are saturated; grading them down
 // lets the full-colour fighters own the frame, while a small set of living
@@ -107,26 +123,38 @@ export class ArenaRenderer {
 
     const textureKey = `arena_${arenaId}`;
     const hasTexture = scene.textures.exists(textureKey) && scene.textures.get(textureKey).key !== '__MISSING';
+    this.drainLayers = [];
+    this.hasPlate = hasTexture;
     if (hasTexture) {
-      // Graded plate, plus a drained monochrome plate above it at alpha 0
-      // that fades in for the KO beat.
+      // The plate is split at the stage's horizon into a background that
+      // scrolls slower than the fighters and a midground floor that moves
+      // with them. Each layer has a graded copy and a drained monochrome copy
+      // above it at alpha 0 that fades in for the KO beat.
       const g = this.mood.grade;
+      const drain = { saturation: -1, brightness: g.brightness * 0.75, contrast: g.contrast + 0.2, tint: [1, 1, 1] };
+      const fight = bakeGrade(scene, textureKey, `${textureKey}__fight`, g);
+      const drained = bakeGrade(scene, textureKey, `${textureKey}__drain`, drain);
+      const { horizon } = getStage(arenaId);
       this.bakedKeys = [
-        bakeGrade(scene, textureKey, `${textureKey}__fight`, g),
-        bakeGrade(scene, textureKey, `${textureKey}__drain`, {
-          saturation: -1, brightness: g.brightness * 0.75, contrast: g.contrast + 0.2, tint: [1, 1, 1],
-        }),
+        fight, drained,
+        bakeMidground(scene, fight, `${textureKey}__fight_mid`, horizon),
+        bakeMidground(scene, drained, `${textureKey}__drain_mid`, horizon),
       ];
-      const background = scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, this.bakedKeys[0])
-        .setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setDepth(0);
-      this.drainPlate = scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, this.bakedKeys[1])
-        .setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setDepth(0.5).setAlpha(0);
-      this.background = background;
-      this.displayObjects.push(background, this.drainPlate);
+      // The camera is bounded to the plate, so a layer scrolling slower than
+      // it drifts by less than the camera's own slack and never shows an edge.
+      const plate = (key, depth, scroll) => scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, key)
+        .setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setDepth(depth).setScrollFactor(scroll);
+      this.background = plate(this.bakedKeys[0], DEPTH.background, BG_PARALLAX);
+      const backgroundDrain = plate(this.bakedKeys[1], DEPTH.backgroundDrain, BG_PARALLAX).setAlpha(0);
+      this.midground = plate(this.bakedKeys[2], DEPTH.midground, 1);
+      const midgroundDrain = plate(this.bakedKeys[3], DEPTH.midgroundDrain, 1).setAlpha(0);
+      this.drainLayers.push(backgroundDrain, midgroundDrain);
+      this.displayObjects.push(this.background, backgroundDrain, this.midground, midgroundDrain);
     } else {
       this.displayObjects.push(drawArena(scene, arenaId, { includeFloor: false }));
     }
 
+    this.createForeground();
     this.createShafts();
     this.createFog();
     this.createFloor();
@@ -144,6 +172,33 @@ export class ArenaRenderer {
       this.displayObjects.push(this.flashRect);
       this.nextLightning = 3000 + Math.random() * 4000;
     }
+  }
+
+  // Props between the fighters and the camera, graded like the plate but
+  // darker, scrolling faster than the fight.
+  createForeground() {
+    const key = `stage_fg_${this.arenaId}`;
+    buildForegroundTexture(this.scene, this.arenaId, key);
+    const g = this.mood.grade;
+    const fight = bakeGrade(this.scene, key, `${key}__fight`, { ...g, brightness: g.brightness * FG_BRIGHTNESS });
+    const drained = bakeGrade(this.scene, key, `${key}__drain`, {
+      saturation: -1, brightness: g.brightness * FG_BRIGHTNESS * 0.75, contrast: g.contrast + 0.2, tint: [1, 1, 1],
+    });
+    this.bakedKeys = [...(this.bakedKeys || []), key, fight, drained];
+    const layer = (k, depth, dy = 0) => this.scene.add.image(FG_BOX[0], FG_BOX[1] + dy, k).setOrigin(0, 0)
+      .setDepth(depth).setScrollFactor(FG_PARALLAX);
+    // The canvas renderer ignores tint fills; there the rim would be a
+    // full-colour copy of the props, so it is left out.
+    if (this.scene.renderer.type === Phaser.WEBGL) {
+      this.foregroundRim = layer(key, DEPTH.foregroundRim, FG_RIM.y).setTintFill(this.mood.light).setAlpha(FG_RIM.alpha);
+      this.displayObjects.push(this.foregroundRim);
+    }
+    this.foreground = layer(fight, DEPTH.foreground);
+    this.foregroundDrain = layer(drained, DEPTH.foregroundDrain).setAlpha(0);
+    // The procedural fallback arena has no drained copy, so the props only
+    // drain when the plate does.
+    if (this.hasPlate) this.drainLayers.push(this.foregroundDrain);
+    this.displayObjects.push(this.foreground, this.foregroundDrain);
   }
 
   createShafts() {
@@ -260,13 +315,38 @@ export class ArenaRenderer {
 
   // 0 = the arena's mood grade, 1 = fully drained to monochrome.
   setDrain(k) {
-    this.drainPlate?.setAlpha(k);
+    for (const layer of this.drainLayers) layer.setAlpha(k);
+    this.drain = k;
+    this.updateForegroundRim();
   }
 
   // Darken the world for a special move or a KO beat.
+  // The foreground sits above the fighters, so the dim rectangle (below
+  // them) cannot reach it; it is darkened by tint to match.
   setDim(alpha, duration = 180) {
     this.scene.tweens.killTweensOf(this.dim);
-    this.scene.tweens.add({ targets: this.dim, alpha, duration, ease: 'Quad.easeOut' });
+    this.scene.tweens.add({
+      targets: this.dim,
+      alpha,
+      duration,
+      ease: 'Quad.easeOut',
+      onUpdate: () => this.tintForeground(1 - this.dim.alpha),
+    });
+  }
+
+  tintForeground(k) {
+    this.light = Phaser.Math.Clamp(k, 0, 1);
+    const v = Math.round(255 * this.light);
+    const tint = (v << 16) | (v << 8) | v;
+    this.foreground.setTint(tint);
+    this.foregroundDrain.setTint(tint);
+    this.updateForegroundRim();
+  }
+
+  // The rim is the stage's light colour: it fades out as the world dims or
+  // drains to monochrome.
+  updateForegroundRim() {
+    this.foregroundRim?.setAlpha(FG_RIM.alpha * (this.light ?? 1) * (1 - (this.drain ?? 0)));
   }
 
   destroy() {
@@ -277,6 +357,25 @@ export class ArenaRenderer {
       if (this.scene.textures.exists(key)) this.scene.textures.remove(key);
     }
   }
+}
+
+// The plate below the horizon, fading in across FEATHER px above it.
+function bakeMidground(scene, srcKey, outKey, horizon) {
+  if (scene.textures.exists(outKey)) scene.textures.remove(outKey);
+  const src = scene.textures.get(srcKey).getSourceImage();
+  const tex = scene.textures.createCanvas(outKey, src.width, src.height);
+  const ctx = tex.getContext();
+  ctx.drawImage(src, 0, 0);
+  const k = src.height / GAME_HEIGHT;
+  const mask = ctx.createLinearGradient(0, (horizon - FEATHER) * k, 0, horizon * k);
+  mask.addColorStop(0, 'rgba(0,0,0,0)');
+  mask.addColorStop(1, 'rgba(0,0,0,1)');
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = mask;
+  ctx.fillRect(0, 0, src.width, src.height);
+  ctx.globalCompositeOperation = 'source-over';
+  tex.refresh();
+  return outKey;
 }
 
 // Particle presets. Every emitter spans the full arena and pre-warms so the

@@ -3,7 +3,7 @@ import { setStretch, setMood } from '../src/art/vector/kit.js';
 // A stand-in 2D context that records every coordinate drawn at the top
 // level. form() shades inside save()/restore() with a translated copy of the
 // path, which is clipped, so nested drawing is not measured.
-function recordingContext() {
+export function recordingContext() {
   const seen = [];
   let depth = 0;
   const add = (x, y) => { if (depth === 0) seen.push([x, y]); };
