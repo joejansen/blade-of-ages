@@ -37,7 +37,7 @@ const PAD_KEYS = [
   ['CROUCH', ['↓']],
   ['LIGHT', ['□']],
   ['HEAVY', ['△']],
-  ['BLOCK', ['L1', 'R1']],
+  ['BLOCK', ['L1', 'R1', 'L2', 'R2']],
   ['SPECIAL', ['○']],
 ];
 
