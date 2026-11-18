@@ -8,7 +8,7 @@
 // glues the layers and a final peak normalise sets the level.
 //
 //   node scripts/synth-sounds.js            render everything
-//   node scripts/synth-sounds.js hit block  render only these
+//   node scripts/synth-sounds.js hit_plate block  render only these
 
 import fs from 'fs';
 import path from 'path';
@@ -43,12 +43,17 @@ class Buffer2 {
   }
 
   // Mixes a mono signal in at `start` seconds with constant-power pan (-1..1).
+  // `pan` may be a function of the signal's own time (seconds) to move it.
   add(mono, { start = 0, gain = 1, pan = 0 } = {}) {
     const off = secs(start);
-    const a = (pan + 1) * Math.PI / 4;
-    const gl = Math.cos(a) * gain * Math.SQRT2;
-    const gr = Math.sin(a) * gain * Math.SQRT2;
+    const panAt = typeof pan === 'function' ? pan : () => pan;
+    let gl = 0, gr = 0;
     for (let i = 0; i < mono.length && i + off < this.n; i++) {
+      if (i === 0 || typeof pan === 'function') {
+        const a = (panAt(i / SR) + 1) * Math.PI / 4;
+        gl = Math.cos(a) * gain * Math.SQRT2;
+        gr = Math.sin(a) * gain * Math.SQRT2;
+      }
       this.L[i + off] += mono[i] * gl;
       this.R[i + off] += mono[i] * gr;
     }
@@ -274,14 +279,7 @@ function whoosh(buf, rand, { len, f0, fPeak, f1, peakAt, q = 1, gain = 1, panFro
     ? f0 + (fPeak - f0) * Math.sin((t / peakAt) * Math.PI / 2)
     : fPeak + (f1 - fPeak) * Math.sin(((t - peakAt) / (len - peakAt)) * Math.PI / 2));
   const band = shape(biquad(noise(len, rand), 'bandpass', f, q), swell(peakAt, len, 1.6));
-  // Split into slices so the pan can move without per-sample bookkeeping.
-  const slices = 12;
-  const sliceLen = Math.ceil(band.length / slices);
-  for (let s = 0; s < slices; s++) {
-    const part = band.subarray(s * sliceLen, Math.min(band.length, (s + 1) * sliceLen + 64));
-    const pan = panFrom + (panTo - panFrom) * (s / (slices - 1));
-    buf.add(part, { start: (s * sliceLen) / SR, gain, pan });
-  }
+  buf.add(band, { gain, pan: (t) => panFrom + (panTo - panFrom) * Math.min(1, t / len) });
 }
 
 // The edge tearing through: a fast downward rip of bright noise.
