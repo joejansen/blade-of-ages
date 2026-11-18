@@ -1,3 +1,6 @@
+import { isVectorWarrior, getVectorRig } from '../art/vector/index.js';
+import { getFighterProfile } from './fighterProfiles.js';
+
 // Landmarks are normalized source-image coordinates, measured on the shipped
 // PNGs. They survive BootScene resampling. A bone runs from start to end;
 // cropTop hides the drawing's assembly tab, not part of the anatomy.
@@ -39,5 +42,7 @@ const OVERRIDES = {
 };
 
 export function getAssetRig(id) {
+  // Fighters drawn in code know their own landmarks exactly.
+  if (isVectorWarrior(id)) return getVectorRig(id, getFighterProfile(id).trail.renderedWeaponLength);
   return { ...COMMON, ...OVERRIDES[id], head: HEADS[id] || HEADS.knight };
 }

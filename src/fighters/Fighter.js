@@ -22,8 +22,10 @@ import { getFighterProfile } from '../config/fighterProfiles.js';
 
 const S = FIGHTER_SCALE;
 const BODY_W = 44 * S;
-const BODY_H = 104 * S;
-const CROUCH_H = 68 * S;
+// Feet to the crown of the skull on HEROIC_RIG (hip 58 + torso 41 + head
+// ~21, less the fighting crouch); crests and plumes above that are not body.
+const BODY_H = 118 * S;
+const CROUCH_H = 80 * S;
 
 const DASH_SPEED = 400 * S;
 const BACKDASH_SPEED = 350 * S;
@@ -82,7 +84,7 @@ export class Fighter {
       this.renderer = assetRenderer;
     } else {
       assetRenderer.destroy();
-      this.renderer = new WarriorRenderer(scene, warriorConfig);
+      this.renderer = new WarriorRenderer(scene, warriorConfig, { displayScale: S });
     }
 
     this.facingRight = facingRight;

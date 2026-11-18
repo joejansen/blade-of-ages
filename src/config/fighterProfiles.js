@@ -1,3 +1,5 @@
+import { HEROIC_RIG } from '../art/vector/index.js';
+
 // Anchor defaults — kept in sync with each warrior's vector draw function
 // (see src/art/warriorArt.js). armOffsetX/Y/Reach locate the sword hand so
 // the weapon trail originates from the same point the blade is drawn from.
@@ -87,39 +89,45 @@ function createProfile(overrides = {}) {
   };
 }
 
+// Every fighter is drawn in code (src/art/vector/<id>.js) on the heroic rig;
+// renderedWeaponLength is the grip-to-tip length its weapon is drawn at.
 export const FIGHTER_PROFILES = {
   knight: createProfile({
-    renderScale: 1.04,
+    rig: HEROIC_RIG,
+    renderScale: 1,
     clipSpeed: { walk: 0.92, heavyAttack: 0.92, special: 0.95 },
     poseBias: { torsoAngle: -2, weaponAngle: 10, legSpread: -1 },
     motion: { idleBreath: 0.8, walkBounce: 0.8, walkStride: 0.85, attackLean: 1.15 },
     fx: { trailColor: 0xd9ecff, specialGlow: 0xffd700 },
     anchors: { armOffsetX: 12, armOffsetY: -8, armReach: 28 },
-    trail: { style: 'slash', sweep: 0.55, lengthScale: 1, widthScale: 1.05, renderedWeaponLength: 55 },
+    trail: { style: 'slash', sweep: 0.55, lengthScale: 1, widthScale: 1.05, renderedWeaponLength: 58 },
     weaponWidth: 10,
   }),
   samurai: createProfile({
+    rig: HEROIC_RIG,
     renderScale: 1,
     clipSpeed: { walk: 1.08, lightAttack: 1.1, special: 1.12 },
     poseBias: { headY: -2, armAngle: -3, weaponAngle: -6 },
     motion: { idleBreath: 0.9, walkBounce: 0.95, walkStride: 1.05, attackLean: 0.95 },
     fx: { trailColor: 0xffe8ef, dustColor: 0xf1d7d7, specialGlow: 0xff6d6d },
     anchors: { armOffsetX: 10, armOffsetY: -6, armReach: 26 },
-    trail: { style: 'slash', sweep: 0.42, lengthScale: 1, widthScale: 0.95, renderedWeaponLength: 50 },
+    trail: { style: 'slash', sweep: 0.42, lengthScale: 1, widthScale: 0.95, renderedWeaponLength: 54 },
     weaponWidth: 8,
   }),
   viking: createProfile({
-    renderScale: 1.06,
+    rig: HEROIC_RIG,
+    renderScale: 1,
     clipSpeed: { walk: 0.95, heavyAttack: 0.88, special: 0.9 },
     poseBias: { headY: 1, torsoAngle: 2, armAngle: 4, legSpread: 2 },
     motion: { idleBreath: 0.75, walkBounce: 1.1, walkStride: 0.95, attackLean: 1.2 },
     fx: { trailColor: 0xbdefff, dustColor: 0xbcb7ac, specialGlow: 0x7ad7ff },
     anchors: { armOffsetX: 12, armOffsetY: -6, armReach: 26 },
-    trail: { style: 'smash', sweep: 0.75, lengthScale: 1.1, widthScale: 1.2, renderedWeaponLength: 48 },
+    trail: { style: 'smash', sweep: 0.75, lengthScale: 1.1, widthScale: 1.2, renderedWeaponLength: 52 },
     weaponWidth: 14,
   }),
   gladiator: createProfile({
-    renderScale: 1.01,
+    rig: HEROIC_RIG,
+    renderScale: 1,
     poseBias: { torsoAngle: 1, armAngle: -1 },
     motion: { walkBounce: 1.05, walkStride: 1, attackLean: 1.05 },
     fx: { trailColor: 0xffd6b2, dustColor: 0xe0c38f, specialGlow: 0xff8b57 },
@@ -127,40 +135,44 @@ export const FIGHTER_PROFILES = {
     // The drawn gladius is only 35px and sits at armReach 26 with armY -4,
     // so the trail must match those values to avoid a second ghost sword.
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 26 },
-    trail: { style: 'tight', sweep: 0.2, lengthScale: 0.95, widthScale: 0.7, alphaScale: 0.75, renderedWeaponLength: 35 },
+    trail: { style: 'tight', sweep: 0.2, lengthScale: 0.95, widthScale: 0.7, alphaScale: 0.75, renderedWeaponLength: 42 },
     weaponWidth: 13,
   }),
   mongol: createProfile({
-    renderScale: 0.98,
+    rig: HEROIC_RIG,
+    renderScale: 1,
     clipSpeed: { walk: 1.1, lightAttack: 1.05, special: 1.08 },
     poseBias: { headY: -1, weaponAngle: -8, legSpread: 1 },
     motion: { walkBounce: 0.95, walkStride: 1.1, attackLean: 0.9 },
     fx: { trailColor: 0xffd7a0, dustColor: 0xdcc497, specialGlow: 0xffa640 },
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 24 },
-    trail: { style: 'slash', sweep: 0.55, lengthScale: 1.05, widthScale: 1, renderedWeaponLength: 45 },
+    trail: { style: 'slash', sweep: 0.55, lengthScale: 1.05, widthScale: 1, renderedWeaponLength: 48 },
     weaponWidth: 10,
   }),
   spartan: createProfile({
-    renderScale: 1.03,
+    rig: HEROIC_RIG,
+    renderScale: 1,
     clipSpeed: { walk: 0.94, heavyAttack: 0.95 },
     poseBias: { torsoAngle: -1, armAngle: 3, legSpread: -1 },
     motion: { walkBounce: 0.85, walkStride: 0.9, attackLean: 1.15 },
     fx: { trailColor: 0xfff2c2, dustColor: 0xd6bc8f, specialGlow: 0xffd700 },
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 26 },
-    trail: { style: 'tight', sweep: 0.28, lengthScale: 0.95, widthScale: 0.85, alphaScale: 0.85, renderedWeaponLength: 35 },
+    trail: { style: 'tight', sweep: 0.28, lengthScale: 0.95, widthScale: 0.85, alphaScale: 0.85, renderedWeaponLength: 40 },
     weaponWidth: 12,
   }),
   pirate: createProfile({
-    renderScale: 0.99,
+    rig: HEROIC_RIG,
+    renderScale: 1,
     clipSpeed: { walk: 1.02, lightAttack: 1.08 },
     poseBias: { torsoAngle: 2, armAngle: -4, weaponAngle: 4 },
     motion: { idleBreath: 1.1, walkBounce: 0.95, walkStride: 1.03, attackLean: 1.05 },
     fx: { trailColor: 0xffe29f, dustColor: 0xc9b08f, specialGlow: 0xffd061 },
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 24 },
-    trail: { style: 'slash', sweep: 0.5, lengthScale: 1, widthScale: 1, renderedWeaponLength: 40 },
+    trail: { style: 'slash', sweep: 0.5, lengthScale: 1, widthScale: 1, renderedWeaponLength: 46 },
     weaponWidth: 11,
   }),
   zulu: createProfile({
+    rig: HEROIC_RIG,
     renderScale: 1,
     clipSpeed: { walk: 1.08, lightAttack: 1.06, special: 1.1 },
     poseBias: { headY: -2, weaponAngle: -12, legSpread: 3 },
@@ -168,21 +180,23 @@ export const FIGHTER_PROFILES = {
     fx: { trailColor: 0xffc794, dustColor: 0xd7aa74, specialGlow: 0xff6b3d },
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 26 },
     // Iklwa is a short stabbing spear: thrust-led motion with negligible lateral sweep.
-    trail: { style: 'thrust', sweep: 0.12, lengthScale: 1.1, widthScale: 0.9, alphaScale: 0.9, renderedWeaponLength: 55 },
+    trail: { style: 'thrust', sweep: 0.12, lengthScale: 1.1, widthScale: 0.9, alphaScale: 0.9, renderedWeaponLength: 52 },
     weaponWidth: 9,
   }),
   conquistador: createProfile({
+    rig: HEROIC_RIG,
     renderScale: 1,
     clipSpeed: { walk: 1, lightAttack: 1.04, heavyAttack: 0.96 },
     poseBias: { torsoAngle: -1, weaponAngle: -4 },
     motion: { walkBounce: 0.9, walkStride: 1.02, attackLean: 0.98 },
     fx: { trailColor: 0xf6f6ff, dustColor: 0xd4c1a3, specialGlow: 0xffd88c },
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 24 },
-    trail: { style: 'thrust', sweep: 0.18, lengthScale: 1.05, widthScale: 0.8, renderedWeaponLength: 52 },
+    trail: { style: 'thrust', sweep: 0.18, lengthScale: 1.05, widthScale: 0.8, renderedWeaponLength: 56 },
     weaponWidth: 8,
   }),
   seal: createProfile({
-    renderScale: 1.02,
+    rig: HEROIC_RIG,
+    renderScale: 1,
     clipSpeed: { walk: 1.06, heavyAttack: 1.02, special: 1.04 },
     poseBias: { headY: 1, torsoAngle: 1, armAngle: -6, weaponAngle: -10 },
     motion: { idleBreath: 0.7, walkBounce: 0.75, walkStride: 0.92, attackLean: 1.08 },
@@ -191,7 +205,7 @@ export const FIGHTER_PROFILES = {
     // Rifle-as-melee reads best with a short, blunt, stock-led smear rather
     // than a sword slash; sweep is narrow and the trail is anchored along the
     // weapon's forward axis.
-    trail: { style: 'stock', sweep: 0.3, lengthScale: 0.85, widthScale: 1.1, alphaScale: 0.8, renderedWeaponLength: 55 },
+    trail: { style: 'stock', sweep: 0.3, lengthScale: 0.85, widthScale: 1.1, alphaScale: 0.8, renderedWeaponLength: 50 },
     weaponWidth: 10,
   }),
 };

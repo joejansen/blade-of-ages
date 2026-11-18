@@ -5,10 +5,12 @@ import { computeWeaponGeometry } from './weaponGeometry.js';
 const AURA_OFFSET_Y = -54;
 
 export class WarriorRenderer {
-  constructor(scene, warriorConfig) {
+  // options.displayScale matches the staging scale the fight simulates at.
+  constructor(scene, warriorConfig, options = {}) {
     this.scene = scene;
     this.config = warriorConfig;
     this.profile = getFighterProfile(warriorConfig.id);
+    this.scale = this.profile.renderScale * (options.displayScale ?? 1);
 
     this.graphics = scene.add.graphics();
     this.graphics.setDepth(12);
@@ -29,7 +31,7 @@ export class WarriorRenderer {
 
     this.graphics.clear();
     this.graphics.setPosition(drawX, drawY);
-    this.graphics.setScale(profile.renderScale);
+    this.graphics.setScale(this.scale);
 
     this.drawAura(0, fxY, pose, specialRatio);
     drawWarrior(this.graphics, this.config.id, 0, 0, dir, pose, this.config.colors, state);
@@ -52,7 +54,7 @@ export class WarriorRenderer {
       this.graphics.x,
       this.graphics.y,
     );
-    this.glowGraphics.setScale(this.profile.renderScale);
+    this.glowGraphics.setScale(this.scale);
   }
 
   drawWeaponTrail(x, y, dir, pose) {
@@ -72,7 +74,7 @@ export class WarriorRenderer {
     const width = (pose.trailWidth ?? this.profile.weaponWidth) * trail.widthScale;
 
     this.trailGraphics.setPosition(this.graphics.x, this.graphics.y);
-    this.trailGraphics.setScale(this.profile.renderScale);
+    this.trailGraphics.setScale(this.scale);
 
     if (trail.style === 'thrust' || trail.style === 'stock') {
       this.drawThrustSmear(geom, dir, width, color, alpha, trail);
