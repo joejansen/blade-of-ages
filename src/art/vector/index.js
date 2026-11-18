@@ -20,8 +20,10 @@ const DEFINITIONS = { knight, samurai, viking, gladiator, mongol, spartan, pirat
 export const PX_PER_UNIT = 5;
 
 // Proportions for vector fighters: roughly seven heads tall, where the
-// PNG puppets stand about four.
-export const HEROIC_RIG = { torso: 41, upperArm: 21, forearm: 20, thigh: 28, shin: 26, sole: 5, hip: 58 };
+// PNG puppets stand about four. `grip` is how far past the wrist the fist
+// closes on a weapon: the fist in anatomy.js centres at y=20.2 in a frame
+// whose wrist is y=19, scaled to the 20-unit forearm.
+export const HEROIC_RIG = { torso: 41, upperArm: 21, forearm: 20, thigh: 28, shin: 26, sole: 5, hip: 58, grip: 1.3 };
 
 export function isVectorWarrior(id) {
   return Boolean(DEFINITIONS[id]);

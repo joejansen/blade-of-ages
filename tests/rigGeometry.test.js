@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import { FIGHTER_PROFILES } from '../src/config/fighterProfiles.js';
 import { getAssetRig } from '../src/config/assetRig.js';
-import { isVectorWarrior } from '../src/art/vector/index.js';
+import { isVectorWarrior, HEROIC_RIG } from '../src/art/vector/index.js';
+import { SHAPES, FRAME } from '../src/art/vector/anatomy.js';
 import { sampleAnimationPose, blendPose } from '../src/fighters/animationClips.js';
 import { RIG, computeRigGeometry, partTransform, solveLimb } from '../src/fighters/rigGeometry.js';
 
@@ -34,8 +35,11 @@ for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) {
       near(rig.backLeg.end.y, 580 + (-R.sole + pose.backFootY) * scale, `${state} back foot planted`);
       near(rig.weapon.tipX + mirror.weapon.tipX, 400, 'mirrored tip x');
       near(rig.weapon.tipY, mirror.weapon.tipY, 'mirrored tip y');
-      near(rig.weapon.handX, rig.frontArm.end.x, 'grip at hand');
-      near(rig.weapon.handY, rig.frontArm.end.y, 'grip at hand');
+      // The grip lies on the forearm's line, `grip` units past the wrist.
+      const fore = { x: rig.frontArm.end.x - rig.frontArm.joint.x, y: rig.frontArm.end.y - rig.frontArm.joint.y };
+      const k = (R.forearm + (R.grip || 0)) / R.forearm;
+      near(rig.weapon.handX, rig.frontArm.joint.x + fore.x * k, 'grip in fist');
+      near(rig.weapon.handY, rig.frontArm.joint.y + fore.y * k, 'grip in fist');
       near(Math.hypot(rig.weapon.tipX - rig.weapon.handX, rig.weapon.tipY - rig.weapon.handY), profile.trail.renderedWeaponLength * scale, 'physical weapon length');
     }
   });
@@ -77,6 +81,16 @@ test('weapons drawn in code run tip-up from the grip; PNG weapons keep their mea
       assert.ok(start[1] < end[1], `${id}: PNG sword is held on its upper grip`);
     }
   }
+});
+
+test('the weapon grip sits at the centre of the drawn fist', () => {
+  // Fist centre in the lower_arm frame, measured past the wrist and scaled
+  // from the drawing's elbow-to-wrist length to the rig's forearm.
+  const ys = SHAPES.fist.map(([, y]) => y);
+  const wrist = FRAME.lower_arm.end[1];
+  const centre = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const expected = (centre - wrist) * HEROIC_RIG.forearm / wrist;
+  assert.ok(Math.abs(HEROIC_RIG.grip - expected) < 0.15, `grip ${HEROIC_RIG.grip} vs fist centre ${expected.toFixed(2)}`);
 });
 
 test('gait alternates lifted feet and blends back to planted idle', () => {

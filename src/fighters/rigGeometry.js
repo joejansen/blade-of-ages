@@ -76,7 +76,12 @@ export function computeRigGeometry(pose, profile, x, baseY, dir, scale = 1) {
   const backLeg = solveLimb({ x: hip.x + 5, y: hip.y }, backTarget, R.thigh, R.shin, -1);
   const world = p => ({ x: x + p.x * dir * scale, y: baseY + p.y * scale });
   const chain = c => ({ root: world(c.root), joint: world(c.joint), end: world(c.end) });
-  const hand = world(frontArm.end);
+  // The grip sits in the fist, which hangs past the wrist along the forearm.
+  const grip = (R.grip || 0) / R.forearm;
+  const hand = world({
+    x: frontArm.end.x + (frontArm.end.x - frontArm.joint.x) * grip,
+    y: frontArm.end.y + (frontArm.end.y - frontArm.joint.y) * grip,
+  });
   const weaponAngle = (pose.weaponAngle || 0) * RAD;
   // FX intensity never changes the physical blade length.
   const weaponLen = profile.trail.renderedWeaponLength * scale;

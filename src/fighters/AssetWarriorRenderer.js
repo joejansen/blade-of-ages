@@ -41,8 +41,9 @@ const SLOT_Z = {
   torso: 4,
   head: 7,
   front_arm_upper: 8,
+  // The weapon passes behind the forearm so the fist closes over the grip.
+  weapon: 8.3,
   front_arm_lower: 8.5,
-  weapon: 9,
 };
 
 // Far-side limbs sit in shade (opaque: a translucent limb shows the arena
