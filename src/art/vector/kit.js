@@ -9,6 +9,16 @@ export const LINE = 1.0;
 // Light falls from the front and above.
 export const LIGHT = [1.7, -1.3];
 
+// Mood, set per warrior while its parts are drawn: how dark the shadow tone
+// is and how far the lit area is pushed off it (a bigger offset leaves a
+// wider shadow crescent).
+let shadowDepth = 0.7;
+let lightOffset = LIGHT;
+export function setMood({ shadow = 0.7, light = LIGHT } = {}) {
+  shadowDepth = shadow;
+  lightOffset = light;
+}
+
 // Horizontal stretch applied to every coordinate while a part is drawn, so
 // a limb can be made stockier without redrawing it or fattening its lines.
 let stretch = 1;
@@ -58,7 +68,7 @@ export function poly(ctx, pts) {
 
 // A shaded, outlined form. `path(ctx)` adds the outline to the current path.
 export function form(ctx, path, fill, opts = {}) {
-  const { shadow = darken(fill), light = LIGHT, line = LINE, ink = INK } = opts;
+  const { shadow = darken(fill, shadowDepth), light = lightOffset, line = LINE, ink = INK } = opts;
   ctx.beginPath();
   path(ctx);
   ctx.fillStyle = shadow;
@@ -105,6 +115,17 @@ export function stroke(ctx, rawPts, width = 0.6, color = INK, curved = true) {
 
 export function disc(ctx, x, y, r, fill, opts) {
   form(ctx, c => c.arc(x * stretch, y, r, 0, Math.PI * 2), fill, opts);
+}
+
+// A soft additive-looking glow (embers, lit eye slits).
+export function glow(ctx, x, y, r, color) {
+  const g = ctx.createRadialGradient(x * stretch, y, 0, x * stretch, y, r);
+  g.addColorStop(0, color);
+  g.addColorStop(1, `${color}00`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x * stretch, y, r, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // A small specular dab.

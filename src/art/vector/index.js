@@ -1,5 +1,5 @@
 import gladiator from './gladiator.js';
-import { setStretch } from './kit.js';
+import { setStretch, setMood } from './kit.js';
 
 // Fighters drawn in code instead of loaded from PNG parts. Each definition
 // lists its parts in rig units; they are baked to canvas textures at boot
@@ -64,8 +64,10 @@ export function buildVectorTextures(scene, id, weaponLength) {
     ctx.scale(PX_PER_UNIT, PX_PER_UNIT);
     ctx.translate(-x0, -y0);
     setStretch(part.stretch || 1);
+    setMood(DEFINITIONS[id].mood);
     part.draw(ctx);
     setStretch(1);
+    setMood();
     const key = `warrior_${id}_${name}`;
     if (scene.textures.exists(key)) scene.textures.remove(key);
     scene.textures.addCanvas(key, canvas);
