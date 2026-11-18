@@ -10,6 +10,7 @@ import { VersusScene } from './scenes/VersusScene.js';
 import { FightScene } from './scenes/FightScene.js';
 import { FightHUDScene } from './scenes/FightHUDScene.js';
 import { ResultScene } from './scenes/ResultScene.js';
+import { gamepads } from './input/gamepads.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -65,4 +66,5 @@ async function waitForFonts() {
 
 waitForFonts().finally(() => {
   window.__game = new Phaser.Game(config);
+  gamepads.attach(window.__game);
 });
