@@ -34,6 +34,7 @@ const SLOT_Z = {
   back_foot: 0.6,
   back_arm_upper: 1,
   back_arm_lower: 1.5,
+  back_shield: 1.7,
   front_leg_upper: 3,
   front_leg_lower: 3.5,
   front_foot: 3.6,
@@ -51,7 +52,7 @@ const BACK_LIMB_SHADE = 0x8d8883;
 // way the fighter faces and drawn behind the rig, so only a sliver shows
 // along the lit edge of the silhouette.
 const RIM_OFFSET = { x: -0.7, y: -1.1 };
-const RIM_ALPHA = 0.7;
+const RIM_ALPHA = 0.55;
 
 function multiplyColor(a, b) {
   const ch = shift => Math.round((((a >> shift) & 0xff) * ((b >> shift) & 0xff)) / 255);
@@ -84,7 +85,15 @@ export class AssetWarriorRenderer {
     this.rimColor = options.rimColor ?? null;
     this.rims = {};
 
-    for (const [slot, spriteName] of Object.entries(SLOT_TO_SPRITE)) {
+    // Fighters drawn in code ship a foot of their own (PNG puppets reuse the
+    // bottom of the shin art) and may carry something in the off hand.
+    this.ownFoot = Boolean(this.rig.foot);
+    const slots = { ...SLOT_TO_SPRITE };
+    if (this.ownFoot) Object.assign(slots, { front_foot: 'foot', back_foot: 'foot' });
+    if (this.rig.shield) slots.back_shield = 'shield';
+    this.slotSprite = slots;
+
+    for (const [slot, spriteName] of Object.entries(slots)) {
       const textureKey = `warrior_${warriorConfig.id}_${spriteName}`;
       if (!scene.textures.exists(textureKey)) {
         this.available = false;
@@ -94,8 +103,8 @@ export class AssetWarriorRenderer {
 
       const cropTop = this.rig[spriteName].cropTop || 0;
       let crop = null;
-      if (slot.endsWith('_foot')) crop = [0, image.height * 0.77, image.width, image.height * 0.23];
-      else if (slot.endsWith('leg_lower')) crop = [0, image.height * cropTop, image.width, image.height * (0.87 - cropTop)];
+      if (!this.ownFoot && slot.endsWith('_foot')) crop = [0, image.height * 0.77, image.width, image.height * 0.23];
+      else if (!this.ownFoot && slot.endsWith('leg_lower')) crop = [0, image.height * cropTop, image.width, image.height * (0.87 - cropTop)];
       else if (cropTop) crop = [0, image.height * cropTop, image.width, image.height * (1 - cropTop)];
       if (crop) image.setCrop(...crop);
 
@@ -192,8 +201,9 @@ export class AssetWarriorRenderer {
       this.#bone(`${name}_upper`, chain.root, chain.joint, !facingRight);
       this.#bone(`${name}_lower`, chain.joint, chain.end, !facingRight);
     }
-    this.#foot('front_foot', rig.frontLeg, !facingRight);
-    this.#foot('back_foot', rig.backLeg, !facingRight);
+    this.#foot('front_foot', rig.frontLeg, !facingRight, scale);
+    this.#foot('back_foot', rig.backLeg, !facingRight, scale);
+    this.#held('back_shield', rig.backArm.end, rig.torsoAngle * 0.6, !facingRight, scale);
     this.#bone('weapon', { x: geom.handX, y: geom.handY }, { x: geom.tipX, y: geom.tipY }, !facingRight);
     this.#head(rig.neck, rig.headAngle, scale, dir);
     const rimX = RIM_OFFSET.x * dir * this.displayScale;
@@ -227,18 +237,31 @@ export class AssetWarriorRenderer {
   #bone(slot, start, end, mirrored) {
     const img = this.parts[slot];
     if (!img) return;
-    const t = partTransform(this.rig[SLOT_TO_SPRITE[slot]], img.width, img.height, start, end, mirrored);
+    const t = partTransform(this.rig[this.slotSprite[slot]], img.width, img.height, start, end, mirrored);
     img.setOrigin(t.originX, t.originY).setFlipX(mirrored)
       .setPosition(start.x, start.y).setRotation(t.rotation).setScale(t.scale);
   }
 
-  #foot(slot, chain, mirrored) {
+  // A part pinned at one point and drawn at rig scale (no bone to span).
+  #held(slot, at, rotation, mirrored, scale) {
+    const img = this.parts[slot];
+    if (!img) return;
+    const source = this.rig[this.slotSprite[slot]];
+    img.setOrigin(mirrored ? 1 - source.start[0] : source.start[0], source.start[1])
+      .setFlipX(mirrored).setPosition(at.x, at.y).setRotation(rotation).setScale(scale / source.pxPerUnit);
+  }
+
+  #foot(slot, chain, mirrored, scale) {
+    if (this.ownFoot) {
+      this.#held(slot, chain.end, 0, mirrored, scale);
+      return;
+    }
     const img = this.parts[slot];
     const source = this.rig.lower_leg;
     const sourceLength = Math.hypot((source.end[0] - source.start[0]) * img.width, (source.end[1] - source.start[1]) * img.height);
-    const scale = Math.hypot(chain.end.x - chain.joint.x, chain.end.y - chain.joint.y) / sourceLength;
+    const shinScale = Math.hypot(chain.end.x - chain.joint.x, chain.end.y - chain.joint.y) / sourceLength;
     img.setOrigin(mirrored ? 1 - source.end[0] : source.end[0], source.end[1])
-      .setFlipX(mirrored).setPosition(chain.end.x, chain.end.y).setRotation(0).setScale(scale);
+      .setFlipX(mirrored).setPosition(chain.end.x, chain.end.y).setRotation(0).setScale(shinScale);
   }
 
   #head(neck, rotation, scale, dir) {

@@ -82,7 +82,7 @@ export class Fighter {
       this.renderer = assetRenderer;
     } else {
       assetRenderer.destroy();
-      this.renderer = new WarriorRenderer(scene, warriorConfig);
+      this.renderer = new WarriorRenderer(scene, warriorConfig, { displayScale: S });
     }
 
     this.facingRight = facingRight;

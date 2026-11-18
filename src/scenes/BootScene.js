@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants.js';
 import { getFighterProfile } from '../config/fighterProfiles.js';
 import { PART_TARGET_HEIGHT } from '../fighters/AssetWarriorRenderer.js';
 import { PALETTE, displayText, bodyText } from '../ui/theme.js';
+import { isVectorWarrior, vectorWarriorIds, buildVectorTextures } from '../art/vector/index.js';
 
 const WARRIORS = ['knight', 'samurai', 'viking', 'gladiator', 'mongol',
                    'spartan', 'pirate', 'zulu', 'conquistador', 'seal'];
@@ -47,6 +48,7 @@ export class BootScene extends Phaser.Scene {
     this.load.on('complete', () => status.setText('Ready'));
 
     for (const warrior of WARRIORS) {
+      if (isVectorWarrior(warrior)) continue; // drawn in code at create()
       for (const part of PARTS) {
         this.load.image(`warrior_${warrior}_${part}`, `assets/warriors/${warrior}/${part}.png`);
       }
@@ -69,7 +71,11 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     let missing = 0;
+    for (const warrior of vectorWarriorIds()) {
+      buildVectorTextures(this, warrior, getFighterProfile(warrior).trail.renderedWeaponLength);
+    }
     for (const warrior of WARRIORS) {
+      if (isVectorWarrior(warrior)) continue;
       const profile = getFighterProfile(warrior);
       for (const part of PARTS) {
         const key = `warrior_${warrior}_${part}`;

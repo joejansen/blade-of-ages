@@ -1,3 +1,5 @@
+import { HEROIC_RIG } from '../art/vector/index.js';
+
 // Anchor defaults — kept in sync with each warrior's vector draw function
 // (see src/art/warriorArt.js). armOffsetX/Y/Reach locate the sword hand so
 // the weapon trail originates from the same point the blade is drawn from.
@@ -119,7 +121,9 @@ export const FIGHTER_PROFILES = {
     weaponWidth: 14,
   }),
   gladiator: createProfile({
-    renderScale: 1.01,
+    // Drawn in code (src/art/vector/gladiator.js) on heroic proportions.
+    rig: HEROIC_RIG,
+    renderScale: 1,
     poseBias: { torsoAngle: 1, armAngle: -1 },
     motion: { walkBounce: 1.05, walkStride: 1, attackLean: 1.05 },
     fx: { trailColor: 0xffd6b2, dustColor: 0xe0c38f, specialGlow: 0xff8b57 },
@@ -127,7 +131,7 @@ export const FIGHTER_PROFILES = {
     // The drawn gladius is only 35px and sits at armReach 26 with armY -4,
     // so the trail must match those values to avoid a second ghost sword.
     anchors: { armOffsetX: 10, armOffsetY: -4, armReach: 26 },
-    trail: { style: 'tight', sweep: 0.2, lengthScale: 0.95, widthScale: 0.7, alphaScale: 0.75, renderedWeaponLength: 35 },
+    trail: { style: 'tight', sweep: 0.2, lengthScale: 0.95, widthScale: 0.7, alphaScale: 0.75, renderedWeaponLength: 42 },
     weaponWidth: 13,
   }),
   mongol: createProfile({
