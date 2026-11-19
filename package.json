@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "generate:art": "node --env-file=.env scripts/generate-art.js",
     "generate:arenas": "node --env-file=.env scripts/generate-arenas.js",
+    "generate:sounds": "node scripts/synth-sounds.js",
     "compress": "node scripts/compress-assets.js",
     "test": "node --test"
   },

@@ -4,6 +4,7 @@ import { getFighterProfile } from '../config/fighterProfiles.js';
 import { PART_TARGET_HEIGHT } from '../fighters/AssetWarriorRenderer.js';
 import { PALETTE, displayText, bodyText } from '../ui/theme.js';
 import { isVectorWarrior, vectorWarriorIds, buildVectorTextures } from '../art/vector/index.js';
+import { SoundManager, SOUND_KEYS } from '../audio/SoundManager.js';
 
 const WARRIORS = ['knight', 'samurai', 'viking', 'gladiator', 'mongol',
                    'spartan', 'pirate', 'zulu', 'conquistador', 'seal'];
@@ -58,18 +59,14 @@ export class BootScene extends Phaser.Scene {
       this.load.image(`arena_${arena}`, `assets/arenas/${arena}.jpg`);
     }
 
-    this.load.audio('light_attack', 'assets/sounds/light_attack.mp3');
-    this.load.audio('heavy_attack', 'assets/sounds/heavy_attack.wav');
-    this.load.audio('jump', 'assets/sounds/jump.mp3');
-    this.load.audio('hit', 'assets/sounds/hit.wav');
-    this.load.audio('block', 'assets/sounds/block.wav');
-    this.load.audio('special', 'assets/sounds/special.mp3');
-    this.load.audio('ui_click', 'assets/sounds/ui_click.mp3');
-    this.load.audio('ui_hover', 'assets/sounds/ui_hover.mp3');
-    this.load.audio('victory', 'assets/sounds/victory.wav');
+    // Rendered by scripts/synth-sounds.js (npm run generate:sounds).
+    for (const key of SOUND_KEYS) {
+      this.load.audio(key, `assets/sounds/${key}.wav`);
+    }
   }
 
   create() {
+    SoundManager.installMasterBus(this.sound);
     let missing = 0;
     for (const warrior of vectorWarriorIds()) {
       buildVectorTextures(this, warrior, getFighterProfile(warrior).trail.renderedWeaponLength);

@@ -1,5 +1,8 @@
 // Warrior roster — stats, colors, and metadata for all 10 fighters
 // Speed/Power/Health are multipliers on base values (1.0 = default)
+// sound.swing picks the swing variant by weapon handling:
+//   blade (heavy straight edge), curved (draw-cut slasher), thrust (short stabbing weapon).
+// sound.armor picks the damage and jump variants: plate, mail (incl. lamellar), light.
 
 export const WARRIORS = [
   {
@@ -7,6 +10,7 @@ export const WARRIORS = [
     name: 'Medieval Knight',
     era: 'Europe, ~1200s',
     weapon: 'Longsword',
+    sound: { swing: 'blade', armor: 'plate' },
     speed: 0.85,
     power: 1.0,
     health: 1.2,
@@ -36,6 +40,7 @@ export const WARRIORS = [
     name: 'Samurai',
     era: 'Japan, ~1600s',
     weapon: 'Katana',
+    sound: { swing: 'curved', armor: 'mail' },
     speed: 1.1,
     power: 1.0,
     health: 1.0,
@@ -65,6 +70,7 @@ export const WARRIORS = [
     name: 'Viking',
     era: 'Scandinavia, ~900s',
     weapon: 'Sword & Axe',
+    sound: { swing: 'blade', armor: 'mail' },
     speed: 0.95,
     power: 1.2,
     health: 1.0,
@@ -94,6 +100,7 @@ export const WARRIORS = [
     name: 'Roman Gladiator',
     era: 'Rome, ~100 AD',
     weapon: 'Gladius & Shield',
+    sound: { swing: 'thrust', armor: 'light' },
     speed: 1.0,
     power: 1.0,
     health: 1.05,
@@ -123,6 +130,7 @@ export const WARRIORS = [
     name: 'Mongol',
     era: 'Central Asia, ~1200s',
     weapon: 'Curved Sword',
+    sound: { swing: 'curved', armor: 'mail' },
     speed: 1.15,
     power: 0.9,
     health: 0.85,
@@ -152,6 +160,7 @@ export const WARRIORS = [
     name: 'Spartan',
     era: 'Greece, ~480 BC',
     weapon: 'Short Sword & Shield',
+    sound: { swing: 'thrust', armor: 'plate' },
     speed: 0.85,
     power: 1.05,
     health: 1.15,
@@ -181,6 +190,7 @@ export const WARRIORS = [
     name: 'Pirate',
     era: 'Caribbean, ~1700s',
     weapon: 'Cutlass',
+    sound: { swing: 'curved', armor: 'light' },
     speed: 1.05,
     power: 0.95,
     health: 0.95,
@@ -210,6 +220,7 @@ export const WARRIORS = [
     name: 'Zulu Warrior',
     era: 'Southern Africa, ~1800s',
     weapon: 'Iklwa (Short Spear)',
+    sound: { swing: 'thrust', armor: 'light' },
     speed: 1.1,
     power: 1.05,
     health: 0.9,
@@ -239,6 +250,7 @@ export const WARRIORS = [
     name: 'Conquistador',
     era: 'Spain, ~1500s',
     weapon: 'Toledo Rapier',
+    sound: { swing: 'thrust', armor: 'plate' },
     speed: 1.0,
     power: 1.0,
     health: 1.0,
@@ -268,6 +280,7 @@ export const WARRIORS = [
     name: 'Navy SEAL',
     era: 'Modern',
     weapon: 'Rifle (as sword)',
+    sound: { swing: 'blade', armor: 'light' },
     speed: 1.1,
     power: 1.1,
     health: 0.9,
